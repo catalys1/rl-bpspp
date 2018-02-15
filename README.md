@@ -2,6 +2,8 @@
 
 ## Maze Environment
 
+A maze environment adapted from boppreh: https://github.com/boppreh/maze
+
 You can run a simple random-action simulation with the following code:
 
 ```

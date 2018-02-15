@@ -250,6 +250,7 @@ class Maze(object):
         return m
 
 
+
 class MazeEnv(object):
     '''
     Class for simulating an agent in a maze.
@@ -265,41 +266,47 @@ class MazeEnv(object):
                 random.randrange(0, self.maze.height))
 
     def _state(self):
+        '''Returns the observable state of the maze based on the agent
         '''
-        '''
+        # The state is which of the walls are standing (or which directions the
+        # agent can't go)
         return self.maze[self.player].walls
         
     def _done(self):
+        '''Return True if the agent has reached the end of the maze
+        '''
         return self.player == self.target
 
     def reset(self):
+        '''Reset the maze.
         '''
-        '''
+        # Right now this recreates a random maze on every call. Might want to
+        # change that
         self.player = self._get_random_position()
         self.target = self._get_random_position()
         return self._state()
 
     def step(self, direction):
-        '''
+        '''Simulate the agent taking an action in the environment.
+        Possible actions are {'n', 's', 'e', 'w'}.
+
+        Returns a 4-tuple of (state, done, reward, info)
         '''
         cell = self.maze[self.player]
-        if direction in cell:
-            return cell
-        
-        next_cell = cell
-        if direction == N:
-            next_cell = self.maze[(cell.x, cell.y-1)]
-        elif direction == E:
-            next_cell = self.maze[(cell.x+1, cell.y)]
-        elif direction == S:
-            next_cell = self.maze[(cell.x, cell.y+1)]
-        elif direction == W:
-            next_cell = self.maze[(cell.x-1, cell.y)]
-
-        if next_cell is None:
+        # If the action is executable (can't go through walls)
+        if direction not in cell:
+            # update the state based on the action
             next_cell = cell
+            if direction == N:
+                next_cell = self.maze[(cell.x, cell.y-1)]
+            elif direction == E:
+                next_cell = self.maze[(cell.x+1, cell.y)]
+            elif direction == S:
+                next_cell = self.maze[(cell.x, cell.y+1)]
+            elif direction == W:
+                next_cell = self.maze[(cell.x-1, cell.y)]
 
-        self.player = (next_cell.x, next_cell.y)
+            self.player = (next_cell.x, next_cell.y)
 
         obs = self._state()
         done = self._done()
