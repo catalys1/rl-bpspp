@@ -1,4 +1,6 @@
-# Reinforcement Learning Using Bayesian Policy Search with Policy Priors
+# rl-bpspp
+
+> Reinforcement Learning Using Bayesian Policy Search with Policy Priors
 
 ## Maze Environment
 
@@ -6,7 +8,7 @@ A maze environment adapted from boppreh: https://github.com/boppreh/maze
 
 You can run a simple random-action simulation with the following code:
 
-```
+```python
 from maze import MazeEnv
 import random
 
@@ -22,5 +24,5 @@ for i in range(10000):
         print(f'Finished in {i} steps')
         break
 if not done:
-	print(f'Failed to finish in {i} steps')
+    print(f'Failed to finish in {i} steps')
 ```
