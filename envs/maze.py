@@ -255,8 +255,12 @@ class MazeEnv(object):
     '''
     Class for simulating an agent in a maze.
     '''
-    def __init__(self, maze):
-        self.maze = maze or Maze.generate()
+    def __init__(self, **kwargs):
+        self.maze = Maze.generate(**kwargs)
+        self.player = self._get_random_position()
+        self.player_start = self.player
+        self.target = self._get_random_position()
+        self.target_start = self.target
 
     def _get_random_position(self):
         """
@@ -277,13 +281,23 @@ class MazeEnv(object):
         '''
         return self.player == self.target
 
+    def render(self, mode='rgb_array'):
+        if mode == 'rgb_array':
+            return self.player, self.target  # TODO
+        elif mode == 'human':
+            from . import console
+            for i in range(1000):  # FIXME
+                console.display(str(self.maze))
+                console.set_display(self.player[1] * 2 + 1, self.player[0] * 4 + 2, '@')
+                console.set_display(self.target[1] * 2 + 1, self.target[0] * 4 + 2, '$')
+
     def reset(self):
         '''Reset the maze.
         '''
         # Right now this recreates a random maze on every call. Might want to
         # change that
-        self.player = self._get_random_position()
-        self.target = self._get_random_position()
+        self.player = self.player_start
+        self.target = self.target_start
         return self._state()
 
     def step(self, direction):
