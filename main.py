@@ -1,6 +1,5 @@
 import random
 import tqdm
-import numpy as np
 import pprint as pp
 import envs.maze
 from collections import defaultdict
@@ -20,7 +19,8 @@ def run_maze(env, obs, policy, all_actions={'n', 's', 'e', 'w'}):
 
 def monte_carlo(env, policy, num_episodes=10, discount_factor=.99):
     value = defaultdict(float)
-    returns = defaultdict(list)
+    returns_sums = defaultdict(float)
+    returns_counts = defaultdict(int)
 
     for _ in tqdm.trange(num_episodes):
         state = env.reset()
@@ -35,8 +35,9 @@ def monte_carlo(env, policy, num_episodes=10, discount_factor=.99):
 
             # first-visit monte carlo
             if state not in episode[:i]:
-                returns[state].append(v)
-                value[state] = np.mean(returns[state])
+                returns_sums[state] += v
+                returns_counts[state] += 1
+                value[state] = returns_sums[state] / returns_counts[state]
 
     return value
 
