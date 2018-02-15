@@ -1,6 +1,5 @@
 import random
 import tqdm
-import pprint as pp
 import envs.maze
 from collections import defaultdict
 
@@ -44,7 +43,8 @@ def monte_carlo(env, policy, num_episodes=10, discount_factor=.99):
 
 def main(value=monte_carlo):
     v = value(envs.maze.MazeEnv(None), random_policy)
-    pp.pprint(dict(v))
+    for k in sorted(v, key=v.get, reverse=True):
+        print(k, v[k])
 
 
 if __name__ == '__main__':
