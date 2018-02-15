@@ -19,5 +19,6 @@ for i in range(10000):
     if done:
         print(f'Finished in {i} steps')
         break
-print(f'Failed to finish in {i} steps')
+if not done:
+	print(f'Failed to finish in {i} steps')
 ```
