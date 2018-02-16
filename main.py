@@ -28,7 +28,8 @@ def monte_carlo(env, policy, num_episodes=50, discount_factor=.99,
             state = env.reset()
             episode = []
             for obs, act, reward in run_maze(env, state, policy):
-                episodes.set_description(str(env.render()))
+                episodes.set_description(
+                    '{} {}, reward: {}'.format(*env.render(), reward))
                 episode.append((tuple(obs), act, reward))
                 state = obs
 
