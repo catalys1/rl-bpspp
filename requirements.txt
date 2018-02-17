@@ -1,0 +1,2 @@
+gym==0.4.8
+https://api.github.com/repos/tuzzer/gym-maze/tarball/aa5c7be

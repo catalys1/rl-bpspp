@@ -2,6 +2,14 @@
 
 > Reinforcement Learning Using Bayesian Policy Search with Policy Priors
 
+
+## Dependencies
+
+```bash
+pip3 install -r requirements.txt
+
+```
+
 ## Maze Environment
 
 A maze environment adapted from boppreh: https://github.com/boppreh/maze
