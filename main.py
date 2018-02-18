@@ -33,7 +33,11 @@ def run_maze(env, policy: Callable[[np.array], np.array]) -> Tuple[np.array, np.
 
 
 def _to_hashable(state):
-    return tuple(state)
+    return state.tobytes()
+
+
+def _to_unhashable(state, dtype=float):
+    return np.frombuffer(state, dtype=dtype)
 
 
 def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: int) -> Callable[[np.array], np.array]:
@@ -87,13 +91,11 @@ def monte_carlo(env,
         for e in episodes:
             policy = create_policy(q, epsilon(e), env.action_space.n)
 
-            episode = [e for e in explore(env, policy)]
+            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy)]
 
             for state, action, reward in episode:
-                first_occurrence_idx = next(i for i, x in enumerate(episode)
-                                            if np.array_equal(x[0], state) and np.array_equal(x[1], action))
+                first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
                 g = sum(x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurrence_idx:]))
-                state = _to_hashable(state)
                 state_action_pair = (state, action)
                 returns_sums[state_action_pair] += g
                 returns_counts[state_action_pair] += 1.0
@@ -116,7 +118,7 @@ def main(control=monte_carlo, debug=False):
 
     time.sleep(.1)  # so print output isn't messed up
     for k in sorted(v, key=v.get, reverse=True):
-        print(k, v[k])
+        print(_to_unhashable(k, dtype=int), v[k])
 
 
 if __name__ == '__main__':
