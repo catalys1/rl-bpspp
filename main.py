@@ -1,121 +1,125 @@
-import numpy as np
-import random
-import tqdm
-import gym
-import gym_maze
-import pprint as pp
+import pprint
+import time
 from collections import defaultdict
+from enum import Enum
+from typing import Callable, Tuple
+
+import gym
+import numpy as np
+from tqdm import tqdm, trange
 
 
-# def random_policy(env):
-#     return env.action_space.sample()
-
-
-def run_maze(env, policy, limit=100000):
-    state = env.reset()
-    for _ in range(limit):
-        probs = policy(state)
-        action = np.random.choice(len(probs), p=probs)
-        observation, reward, done, info = env.step(action)
-        if done:
-            break
-        state = observation
-        yield observation, action, reward
-
-
-def make_epsilon_greedy_policy(q, epsilon, number_of_actions):
+class VisitType(Enum):
+    """Monte Carlo prediction type of visiting a state (s).
+    See Also: "Reinforcement Learning: An Introduction", Richard S. Sutton and Andrew G. Barto, p. 74
     """
-    Creates an epsilon-greedy policy based on a given Q-function and epsilon.
+    FIRST = 1  # first-visit MC method estimates vπ(s) as the average of the returns following first visits to s
+    EVERY = 2  # every-visit MC method averages the returns following all visits to s
+
+
+def run_maze(env, policy: Callable[[np.array], np.array]) -> Tuple[np.array, np.array, float]:
+    state = env.reset()
+    while True:
+        probabilities = policy(state)
+        action = np.random.choice(len(probabilities), p=probabilities)
+        observation, reward, done, info = env.step(action)
+
+        yield state, action, reward
+
+        if done:
+            return
+        state = observation
+
+
+def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: int) -> Callable[[np.array], np.array]:
+    """Creates an epsilon-greedy policy based on a given Q-function and epsilon.
 
     Args:
-        q: A dictionary that maps from state -> action-values.
-            Each value is a numpy array of length nA (see below)
-        epsilon: The probability to select a random action . float between 0 and 1.
-        number_of_actions: Number of actions in the environment.
+        q: A dictionary that maps state -> action-values. Each value is a np.array of length number_of_actions.
+        epsilon: The probability of sampling a random action. Float between 0 and 1.
+        num_actions: Number of actions in the environment.
 
     Returns:
-        A function that takes the observation as an argument and returns
-        the probabilities for each action in the form of a numpy array of length nA.
+        A policy function which maps an observation -> action probabilities, in the form of a np.array of length
+        number_of_actions.
     """
 
-    def policy_fn(observation):
-        a = np.ones(number_of_actions, dtype=float) * epsilon / number_of_actions
-        best_action = np.argmax(q[tuple(observation)])
-        a[best_action] += (1.0 - epsilon)
-        return a
+    def policy_fn(observation: np.array) -> np.array:
+        action_probabilities = np.ones(num_actions, dtype=float) * epsilon / num_actions
+        best_action = np.argmax(q[observation])
+        action_probabilities[best_action] += (1.0 - epsilon)
+        return action_probabilities
 
     return policy_fn
 
 
-def monte_carlo(env, num_episodes=10, discount_factor=.8, epsilon=0.1, explore=run_maze, visit_type='first'):
+def monte_carlo(env,
+                create_policy=create_epsilon_greedy_policy, explore=run_maze,
+                num_episodes=100, discount_factor=.95, epsilon=lambda i: 0.1 ** i,
+                debug=False) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
+    """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
+
+    Args:
+        env: An OpenAI gym environment.
+        create_policy: A function used to create a policy function which maps an observation -> action probabilities.
+        num_episodes: Number of episodes to sample.
+        explore: A function used to explore the env.
+        discount_factor: Gamma discount factor for future rewards.
+        epsilon: A function to compute the probability of sampling a random action.
+        debug: Whether or not to enable debug print statements.
+
+    Returns:
+        A tuple (Q, policy).
+        Q is a dictionary mapping state -> action values.
+        Policy is a function which maps an observation -> action probabilities.
+    """
     q = defaultdict(lambda: np.zeros(env.action_space.n))
     returns_sums = defaultdict(float)
-    returns_counts = defaultdict(int)
+    returns_counts = defaultdict(float)
+    policy = lambda: None
 
-    with tqdm.trange(num_episodes) as episodes:
+    with trange(num_episodes) as episodes:
         for e in episodes:
+            policy = create_policy(q, epsilon(e), env.action_space.n)
 
-            policy = make_epsilon_greedy_policy(q, epsilon ** e, env.action_space.n)
+            episode = [e for e in explore(env, policy)]
 
-            episode = []
-            for observation, action, reward in explore(env, policy):
-                # env.render()
-                episode.append((tuple(observation), action, reward))
+            for state, action, reward in episode:
+                first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
+                g = sum(x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurrence_idx:]))
+                returns_sums[(state, action)] += g
+                returns_counts[(state, action)] += 1.0
+                q[state][action] = returns_sums[(state, action)] / returns_counts[(state, action)]
 
-            v = 0
-            iterations_to_complete = 0
-            for i, (state, action, reward) in reversed(list(enumerate(episode[:-1]))):
-
-                if visit_type == 'fist' and (state, action, reward) in episode[:i - 1]:
-                    continue
-
-                v += episode[i + 1][2]
-                returns_sums[(state, action)] += v
-                returns_counts[(state, action)] += 1
-                avg = returns_sums[(state, action)] / returns_counts[(state, action)]
-                q[state][action] = avg
-                iterations_to_complete += 1
-
-            episodes.set_description(str(iterations_to_complete))
+            if debug:
+                tqdm.write(pprint.pformat(dict(q)))
 
     return q, policy
 
 
-def mc_control_epsilon_greedy(env, num_episodes=1000, discount_factor=1.0, epsilon=0.1, explore=run_maze, visit_type='first'):
-    q = defaultdict(lambda: np.zeros(env.action_space.n))
-    returns_sums = defaultdict(float)
-    returns_count = defaultdict(int)
+def main(control=monte_carlo, debug=False):
+    from gym.envs.registration import register
+    register(
+        id='NChain-custom-v0',
+        entry_point='gym.envs.toy_text:NChainEnv',
+        kwargs={'n': 4, 'slip': 0.0, 'small': 0, 'large': 10},
+        max_episode_steps=100,
+    )
+    env = gym.make("NChain-custom-v0")
 
-    with tqdm.trange(num_episodes) as episodes:
-        for e in episodes:
+    v = defaultdict(float)
+    q, policy = control(env, create_epsilon_greedy_policy, debug=debug)
+    for state, actions in q.items():
+        action_value = np.max(actions)
+        v[state] = action_value
 
-            policy = make_epsilon_greedy_policy(q, epsilon ** e, env.action_space.n)
+    time.sleep(.1)  # so print output isn't messed up
+    for k in sorted(v, key=v.get, reverse=True):
+        print(k, v[k])
 
-            episode = []
-            sa_in_episode = set()
-            for observation, action, reward in explore(env, policy):
-                if e == 0:
-                    env.render()
-                episode.append((tuple(observation), action, reward))
-                sa_in_episode.add((tuple(observation), action))
 
-            # v = 0
-            for state, action in sa_in_episode:
-                sa_pair = (state, action)
-                # Find the first occurance of the (state, action) pair in the episode
-                first_occurence_idx = next(i for i, x in enumerate(episode)
-                                           if np.array_equal(x[0], state) and x[1] == action)
-                # Sum up all rewards since the first occurance
-                G = sum([x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurence_idx:])])
-                # Calculate average return for this state over all sampled episodes
-                returns_sums[sa_pair] += G
-                returns_count[sa_pair] += 1
-                q[state][action] = returns_sums[sa_pair] / returns_count[sa_pair]
-
-            pp.pprint(q)
-            episodes.set_description(str(len(episode)))
-
-    return q, policy
+if __name__ == '__main__':
+    main(debug=False)
 
 
 def main(control=mc_control_epsilon_greedy):
