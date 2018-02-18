@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Callable, Tuple
 
 import gym
+import gym_maze
 import numpy as np
 from tqdm import tqdm, trange
 
@@ -31,6 +32,10 @@ def run_maze(env, policy: Callable[[np.array], np.array]) -> Tuple[np.array, np.
         state = observation
 
 
+def _to_hashable(state):
+    return tuple(state)
+
+
 def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: int) -> Callable[[np.array], np.array]:
     """Creates an epsilon-greedy policy based on a given Q-function and epsilon.
 
@@ -46,7 +51,7 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
 
     def policy_fn(observation: np.array) -> np.array:
         action_probabilities = np.ones(num_actions, dtype=float) * epsilon / num_actions
-        best_action = np.argmax(q[observation])
+        best_action = np.argmax(q[_to_hashable(observation)])
         action_probabilities[best_action] += (1.0 - epsilon)
         return action_probabilities
 
@@ -55,7 +60,7 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
 
 def monte_carlo(env,
                 create_policy=create_epsilon_greedy_policy, explore=run_maze,
-                num_episodes=100, discount_factor=.95, epsilon=lambda i: 0.1 ** i,
+                num_episodes=50, discount_factor=.95, epsilon=lambda i: 0.1 ** i,
                 debug=False) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
     """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
 
@@ -85,11 +90,14 @@ def monte_carlo(env,
             episode = [e for e in explore(env, policy)]
 
             for state, action, reward in episode:
-                first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
+                first_occurrence_idx = next(i for i, x in enumerate(episode)
+                                            if np.array_equal(x[0], state) and np.array_equal(x[1], action))
                 g = sum(x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurrence_idx:]))
-                returns_sums[(state, action)] += g
-                returns_counts[(state, action)] += 1.0
-                q[state][action] = returns_sums[(state, action)] / returns_counts[(state, action)]
+                state = _to_hashable(state)
+                state_action_pair = (state, action)
+                returns_sums[state_action_pair] += g
+                returns_counts[state_action_pair] += 1.0
+                q[state][action] = returns_sums[state_action_pair] / returns_counts[state_action_pair]
 
             if debug:
                 tqdm.write(pprint.pformat(dict(q)))
@@ -98,14 +106,7 @@ def monte_carlo(env,
 
 
 def main(control=monte_carlo, debug=False):
-    from gym.envs.registration import register
-    register(
-        id='NChain-custom-v0',
-        entry_point='gym.envs.toy_text:NChainEnv',
-        kwargs={'n': 4, 'slip': 0.0, 'small': 0, 'large': 10},
-        max_episode_steps=100,
-    )
-    env = gym.make("NChain-custom-v0")
+    env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
 
     v = defaultdict(float)
     q, policy = control(env, create_epsilon_greedy_policy, debug=debug)
@@ -120,19 +121,3 @@ def main(control=monte_carlo, debug=False):
 
 if __name__ == '__main__':
     main(debug=False)
-
-
-def main(control=mc_control_epsilon_greedy):
-    env = gym.make("maze-sample-5x5-v0")  # TODO: change to random
-    v = defaultdict(float)
-    q, policy = control(env)
-    for state, actions in q.items():
-        action_value = np.max(actions)
-        v[state] = action_value
-
-    for k in sorted(v, key=v.get, reverse=True):
-        print(k, v[k])
-
-
-if __name__ == '__main__':
-    main()

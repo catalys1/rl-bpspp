@@ -1,2 +1,1 @@
-gym
-/Users/wm/Documents/byu/cs678/developer.nosync/gym-maze
+https://api.github.com/repos/mwilliammyers/gym-maze/tarball/8d197f1
