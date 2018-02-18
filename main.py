@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 import gym
 import gym_maze
 import numpy as np
-from tqdm import tqdm, trange
+from tqdm import trange
 
 
 class VisitType(Enum):
