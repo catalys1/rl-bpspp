@@ -23,10 +23,12 @@ def run_maze(env, policy: Callable[[np.array], np.array]) -> Tuple[np.array, np.
         probabilities = policy(state)
         action = np.random.choice(len(probabilities), p=probabilities)
         observation, reward, done, info = env.step(action)
+
+        yield state, action, reward
+
         if done:
-            break
+            return
         state = observation
-        yield observation, action, reward
 
 
 def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: int) -> Callable[[np.array], np.array]:
@@ -53,8 +55,8 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
 
 def monte_carlo(env,
                 create_policy=create_epsilon_greedy_policy, explore=run_maze,
-                num_episodes=100, discount_factor=.8, epsilon=lambda i: 0.1 ** i,
-                visit_type=VisitType.EVERY, debug=False) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
+                num_episodes=100, discount_factor=.95, epsilon=lambda i: 0.1 ** i,
+                debug=False) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
     """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
 
     Args:
@@ -64,7 +66,6 @@ def monte_carlo(env,
         explore: A function used to explore the env.
         discount_factor: Gamma discount factor for future rewards.
         epsilon: A function to compute the probability of sampling a random action.
-        visit_type: The Monte-Carlo visit type (FIST, EVERY).
         debug: Whether or not to enable debug print statements.
 
     Returns:
@@ -74,31 +75,22 @@ def monte_carlo(env,
     """
     q = defaultdict(lambda: np.zeros(env.action_space.n))
     returns_sums = defaultdict(float)
-    returns_counts = defaultdict(int)
+    returns_counts = defaultdict(float)
     policy = lambda: None
 
     with trange(num_episodes) as episodes:
         for e in episodes:
             policy = create_policy(q, epsilon(e), env.action_space.n)
 
-            episode = []
-            for observation, action, reward in explore(env, policy):
-                if debug:
-                    env.render()
-                episode.append((observation, action, reward))
+            episode = [e for e in explore(env, policy)]
 
-            v = 0
-            for i, (state, action, reward) in reversed(list(enumerate(episode[:-1]))):
-
-                if visit_type == VisitType.FIRST and any(e for e in episode[:i - 1] if e[0] == state):
-                    continue
-
-                v += episode[i + 1][2] * discount_factor ** i
-                returns_sums[(state, action)] += v
-                returns_counts[(state, action)] += 1
+            for state, action, reward in episode:
+                first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
+                g = sum(x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurrence_idx:]))
+                returns_sums[(state, action)] += g
+                returns_counts[(state, action)] += 1.0
                 q[state][action] = returns_sums[(state, action)] / returns_counts[(state, action)]
 
-            episodes.set_description(str(env._elapsed_steps))
             if debug:
                 tqdm.write(pprint.pformat(dict(q)))
 
@@ -116,7 +108,7 @@ def main(control=monte_carlo, debug=False):
     env = gym.make("NChain-custom-v0")
 
     v = defaultdict(float)
-    q, policy = control(env, create_epsilon_greedy_policy)
+    q, policy = control(env, create_epsilon_greedy_policy, debug=debug)
     for state, actions in q.items():
         action_value = np.max(actions)
         v[state] = action_value
@@ -127,4 +119,4 @@ def main(control=monte_carlo, debug=False):
 
 
 if __name__ == '__main__':
-    main()
+    main(debug=False)
