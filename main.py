@@ -1,4 +1,3 @@
-import pprint
 import time
 from collections import defaultdict
 from enum import Enum
@@ -62,10 +61,8 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
     return policy_fn
 
 
-def monte_carlo(env,
-                create_policy=create_epsilon_greedy_policy, explore=run_maze,
-                num_episodes=50, discount_factor=.95, epsilon=lambda i: 0.1 ** i,
-                debug=False) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
+def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=50, discount_factor=.95,
+                epsilon=lambda i: 0.1 ** i) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
     """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
 
     Args:
@@ -75,7 +72,6 @@ def monte_carlo(env,
         explore: A function used to explore the env.
         discount_factor: Gamma discount factor for future rewards.
         epsilon: A function to compute the probability of sampling a random action.
-        debug: Whether or not to enable debug print statements.
 
     Returns:
         A tuple (Q, policy).
@@ -101,25 +97,22 @@ def monte_carlo(env,
                 returns_counts[state_action_pair] += 1.0
                 q[state][action] = returns_sums[state_action_pair] / returns_counts[state_action_pair]
 
-            if debug:
-                tqdm.write(pprint.pformat(dict(q)))
-
     return q, policy
 
 
-def main(control=monte_carlo, debug=False):
+def main(control=monte_carlo):
     env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
 
     v = defaultdict(float)
-    q, policy = control(env, create_epsilon_greedy_policy, debug=debug)
+    q, policy = control(env, create_epsilon_greedy_policy)
     for state, actions in q.items():
         action_value = np.max(actions)
         v[state] = action_value
 
     time.sleep(.1)  # so print output isn't messed up
     for k in sorted(v, key=v.get, reverse=True):
-        print(_to_unhashable(k, dtype=int), v[k])
+        print(tuple(_to_unhashable(k, dtype=int)), v[k])
 
 
 if __name__ == '__main__':
-    main(debug=False)
+    main()
