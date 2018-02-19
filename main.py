@@ -17,12 +17,15 @@ class VisitType(Enum):
     EVERY = 2  # every-visit MC method averages the returns following all visits to s
 
 
-def run_maze(env, policy: Callable[[np.array], np.array]) -> Tuple[np.array, np.array, float]:
+def run_maze(env, policy: Callable[[np.array], np.array], render=False) -> Tuple[np.array, np.array, float]:
     state = env.reset()
     while True:
         probabilities = policy(state)
         action = np.random.choice(len(probabilities), p=probabilities)
         observation, reward, done, info = env.step(action)
+
+        if render:
+            env.render()
 
         yield state, action, reward
 
@@ -61,7 +64,7 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
     return policy_fn
 
 
-def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=50, discount_factor=.95,
+def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=30, discount_factor=.95,
                 epsilon=lambda i: 0.1 ** i) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
     """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
 
@@ -87,7 +90,7 @@ def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maz
         for e in episodes:
             policy = create_policy(q, epsilon(e), env.action_space.n)
 
-            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy)]
+            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy, render=e == num_episodes - 1)]
 
             for state, action, reward in episode:
                 first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
@@ -101,7 +104,7 @@ def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maz
 
 
 def main(control=monte_carlo):
-    env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
+    env = gym.make("maze-sample-10x10-v0")  # TODO: change to random
 
     v = defaultdict(float)
     q, policy = control(env, create_epsilon_greedy_policy)
