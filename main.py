@@ -64,7 +64,8 @@ def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: in
     return policy_fn
 
 
-def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=30, discount_factor=.95,
+def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=50,
+                discount_factor=.95,
                 epsilon=lambda i: 0.1 ** i) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
     """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
 
@@ -90,7 +91,7 @@ def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maz
         for e in episodes:
             policy = create_policy(q, epsilon(e), env.action_space.n)
 
-            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy, render=e == num_episodes - 1)]
+            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy, render=e == num_episodes)]
 
             for state, action, reward in episode:
                 first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
@@ -104,7 +105,7 @@ def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maz
 
 
 def main(control=monte_carlo):
-    env = gym.make("maze-sample-10x10-v0")  # TODO: change to random
+    env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
 
     v = defaultdict(float)
     q, policy = control(env, create_epsilon_greedy_policy)
