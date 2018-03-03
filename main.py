@@ -1,27 +1,15 @@
-import time
-from collections import defaultdict
-from enum import Enum
 from typing import Callable, Tuple
 
 import gym
-import gym_maze
 import numpy as np
 from tqdm import trange
-
-
-class VisitType(Enum):
-    """Monte Carlo prediction type of visiting a state (s).
-    See Also: "Reinforcement Learning: An Introduction", Richard S. Sutton and Andrew G. Barto, p. 74
-    """
-    FIRST = 1  # first-visit MC method estimates vπ(s) as the average of the returns following first visits to s
-    EVERY = 2  # every-visit MC method averages the returns following all visits to s
-
+from collections import defaultdict
 
 def run_maze(env, policy: Callable[[np.array], np.array], render=False) -> Tuple[np.array, np.array, float]:
     state = env.reset()
     while True:
-        probabilities = policy(state)
-        action = np.random.choice(len(probabilities), p=probabilities)
+        # probabilities = policy(state)
+        # action = np.random.choice(len(probabilities), p=probabilities)
         observation, reward, done, info = env.step(action)
 
         if render:
@@ -34,89 +22,87 @@ def run_maze(env, policy: Callable[[np.array], np.array], render=False) -> Tuple
         state = observation
 
 
-def _to_hashable(state):
-    return state.tobytes()
+def policy_proposal_kernel(parameters):
+    parameter_key = np.random.choice(parameters.keys())
+    if parameter_key == 'bias':
+        new_bias = np.random.dirichlet([1.0]*4)
+        parameters[parameter_key] = new_bias
+    elif parameter_key == 'policy':
+        policy = parameters[parameter_key]
+        state_row = np.random.randint(0, policy.shape[0])
+        state_col = np.random.randint(0, policy.shape[1])
+        action = np.random.randint(0, 4)
+        distribution = np.zeros(4)
+        distribution[action] = 1.0
+        policy[state_row, state_col] = distribution
+        parameters[parameter_key] = policy
+    return parameters
 
 
-def _to_unhashable(state, dtype=float):
-    return np.frombuffer(state, dtype=dtype)
+def value(env, policy, explore=run_maze):
+    total_reward = 0.0
+    for state, action, reward in trange(explore(env, policy)):
+        total_reward += reward
+    return total_reward
 
 
-def create_epsilon_greedy_policy(q: defaultdict, epsilon: float, num_actions: int) -> Callable[[np.array], np.array]:
-    """Creates an epsilon-greedy policy based on a given Q-function and epsilon.
-
-    Args:
-        q: A dictionary that maps state -> action-values. Each value is a np.array of length number_of_actions.
-        epsilon: The probability of sampling a random action. Float between 0 and 1.
-        num_actions: Number of actions in the environment.
-
-    Returns:
-        A policy function which maps an observation -> action probabilities, in the form of a np.array of length
-        number_of_actions.
-    """
-
-    def policy_fn(observation: np.array) -> np.array:
-        action_probabilities = np.ones(num_actions, dtype=float) * epsilon / num_actions
-        best_action = np.argmax(q[_to_hashable(observation)])
-        action_probabilities[best_action] += (1.0 - epsilon)
-        return action_probabilities
-
-    return policy_fn
+def init_parameters(rows=3, cols=3):
+    bias = np.random.dirichlet(1.0, 4)
+    pi = np.random.multinomial(1, bias, (rows, cols))
+    return {'bias': bias, 'policy': pi}
 
 
-def monte_carlo(env, create_policy=create_epsilon_greedy_policy, explore=run_maze, num_episodes=50,
-                discount_factor=.95,
-                epsilon=lambda i: 0.1 ** i) -> Tuple[defaultdict, Callable[[np.array], np.array]]:
-    """Monte Carlo Control using Epsilon-Greedy policies. Finds an optimal epsilon-greedy policy.
-
-    Args:
-        env: An OpenAI gym environment.
-        create_policy: A function used to create a policy function which maps an observation -> action probabilities.
-        num_episodes: Number of episodes to sample.
-        explore: A function used to explore the env.
-        discount_factor: Gamma discount factor for future rewards.
-        epsilon: A function to compute the probability of sampling a random action.
-
-    Returns:
-        A tuple (Q, policy).
-        Q is a dictionary mapping state -> action values.
-        Policy is a function which maps an observation -> action probabilities.
-    """
-    q = defaultdict(lambda: np.zeros(env.action_space.n))
-    returns_sums = defaultdict(float)
-    returns_counts = defaultdict(float)
-    policy = lambda: None
-
-    with trange(num_episodes) as episodes:
-        for e in episodes:
-            policy = create_policy(q, epsilon(e), env.action_space.n)
-
-            episode = [(_to_hashable(s), a, r) for s, a, r in explore(env, policy, render=e == num_episodes)]
-
-            for state, action, reward in episode:
-                first_occurrence_idx = next(i for i, x in enumerate(episode) if x[0] == state and x[1] == action)
-                g = sum(x[2] * (discount_factor ** i) for i, x in enumerate(episode[first_occurrence_idx:]))
-                state_action_pair = (state, action)
-                returns_sums[state_action_pair] += g
-                returns_counts[state_action_pair] += 1.0
-                q[state][action] = returns_sums[state_action_pair] / returns_counts[state_action_pair]
-
-    return q, policy
+def metropolis_hastings(env, current_policy, current_value, value_fn=value, proposal_kernel_fn=policy_proposal_kernel,
+                        iterations=1000):
+    # acceptance_count = 0
+    for _ in trange(iterations):
+        policy_prime = proposal_kernel_fn(current_policy)
+        value_prime = value_fn(env, policy_prime)
+        # gaussian for proposal distribution; q(x|x') / q(x'|x) == 1.0
+        a = value_prime / current_value
+        if np.random.random() <= np.minimum(1, a):
+            current_policy = policy_prime
+            current_value = value_prime
+            # acceptance_count += 1
+#     return current_policy, current_value
 
 
-def main(control=monte_carlo):
-    env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
+def run_model():
 
-    v = defaultdict(float)
-    q, policy = control(env, create_epsilon_greedy_policy)
-    for state, actions in q.items():
-        action_value = np.max(actions)
-        v[state] = action_value
+    pass
 
-    time.sleep(.1)  # so print output isn't messed up
-    for k in sorted(v, key=v.get, reverse=True):
-        print(tuple(_to_unhashable(k, dtype=int)), v[k])
+def main(search_for_policy=metropolis_hastings):
+    gym.envs.registration.register(
+        id='NChain-custom-v0',
+        entry_point='gym.envs.toy_text:NChainEnv',
+        kwargs={'n': 5, 'slip': 0.0},
+        max_episode_steps=1000
+    )
+    env = gym.make('NChain-custom-v0')
 
+    parameters = init_parameters()
+    current_value = value(env, parameters['policy'])
+    current_trace = 0
+
+
+
+
+
+
+    # env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
+
+
+
+
+    # v = defaultdict(float)
+    # q, policy = control(env, create_epsilon_greedy_policy)
+    # for state, actions in q.items():
+    #     action_value = np.max(actions)
+    #     v[state] = action_value
+    #
+    # time.sleep(.1)  # so print output isn't messed up
+    # for k in sorted(v, key=v.get, reverse=True):
+    #     print(tuple(_to_unhashable(k, dtype=int)), v[k])
 
 if __name__ == '__main__':
     main()
