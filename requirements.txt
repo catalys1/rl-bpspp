@@ -1,3 +1,4 @@
+scipy
 edward>=1.3.5
 gym==0.9.7
 https://api.github.com/repos/mwilliammyers/gym-maze/tarball/8d197f1

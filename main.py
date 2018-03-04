@@ -1,77 +1,93 @@
-from typing import Callable, Tuple
-
 import gym
 import numpy as np
 from tqdm import trange
-from collections import defaultdict
-
-def run_maze(env, policy: Callable[[np.array], np.array], render=False) -> Tuple[np.array, np.array, float]:
-    state = env.reset()
-    while True:
-        # probabilities = policy(state)
-        # action = np.random.choice(len(probabilities), p=probabilities)
-        observation, reward, done, info = env.step(action)
-
-        if render:
-            env.render()
-
-        yield state, action, reward
-
-        if done:
-            return
-        state = observation
+import scipy.stats
 
 
-def policy_proposal_kernel(parameters):
-    parameter_key = np.random.choice(parameters.keys())
-    if parameter_key == 'bias':
-        new_bias = np.random.dirichlet([1.0]*4)
-        parameters[parameter_key] = new_bias
-    elif parameter_key == 'policy':
-        policy = parameters[parameter_key]
-        state_row = np.random.randint(0, policy.shape[0])
-        state_col = np.random.randint(0, policy.shape[1])
-        action = np.random.randint(0, 4)
-        distribution = np.zeros(4)
-        distribution[action] = 1.0
-        policy[state_row, state_col] = distribution
-        parameters[parameter_key] = policy
-    return parameters
+class Model:
+    def __init__(self, env):
+        self.env = env
+
+        # TODO: do these need to change throughout the program?
+        self.bias = scipy.stats.dirichlet([1.0] * env.action_space.n)
+        self.pi = scipy.stats.multinomial(n=1, p=self.bias.rvs()[0])
+
+        if isinstance(env.observation_space, gym.spaces.Box):
+            self._policy_size = self.env.observation_space.high[0] + 1
+        elif isinstance(env.observation_space, gym.spaces.Discrete):
+            self._policy_size = env.observation_space.n
+        else:
+            raise ValueError("Cannot determine policy size")
+
+        self.policy = self.pi.rvs(size=self._policy_size)
+
+        self.reward = self.run()
+
+    def propose_policy(self, from_policy=None):
+        if from_policy is None:
+            from_policy = self.policy
+
+        if np.random.randint(0, 2) == 0:
+            # TODO: this doesnt seem right? just sample it again?
+            self.bias = scipy.stats.dirichlet([1.0] * self.env.action_space.n)
+        else:
+            from_policy = np.copy(from_policy)
+            state_row = np.random.randint(0, from_policy.shape[0])
+            state_col = np.random.randint(0, from_policy.shape[1])
+            action = np.random.randint(0, self.env.action_space.n)
+            distribution = np.zeros(self.env.action_space.n)
+            distribution[action] = 1.0
+            from_policy[state_row, state_col] = distribution
+
+        return from_policy
+
+    def run(self, policy=None, render=False):
+        if policy is None:
+            policy = self.policy
+
+        state = self.env.reset()
+        total_reward = 0.0
+        while True:
+            # probabilities = policy(state)
+            # action = np.random.choice(len(probabilities), p=probabilities)
+            action = np.argwhere(policy[state])[0][0]  # TODO: awk...
+            observation, reward, done, info = self.env.step(action)
+
+            if render:
+                self.env.render()
+
+            total_reward += reward
+
+            if done:
+                break
+            state = observation
+
+        return total_reward
+
+    def distributions(self):
+        return [self.bias, self.pi]
 
 
-def value(env, policy, explore=run_maze):
-    total_reward = 0.0
-    for state, action, reward in trange(explore(env, policy)):
-        total_reward += reward
-    return total_reward
-
-
-def init_parameters(rows=3, cols=3):
-    bias = np.random.dirichlet(1.0, 4)
-    pi = np.random.multinomial(1, bias, (rows, cols))
-    return {'bias': bias, 'policy': pi}
-
-
-def metropolis_hastings(env, current_policy, current_value, value_fn=value, proposal_kernel_fn=policy_proposal_kernel,
-                        iterations=1000):
+def metropolis_hastings(model, iterations=1000):
     # acceptance_count = 0
+    log_liklihood = 0.0
     for _ in trange(iterations):
-        policy_prime = proposal_kernel_fn(current_policy)
-        value_prime = value_fn(env, policy_prime)
-        # gaussian for proposal distribution; q(x|x') / q(x'|x) == 1.0
-        a = value_prime / current_value
-        if np.random.random() <= np.minimum(1, a):
-            current_policy = policy_prime
-            current_value = value_prime
+        policy_prime = model.propose_policy()
+        reward_prime = model.run(policy=policy_prime)
+        # TODO: need to get the logpdf of the dirichlet at the current frozen dirichlet sample and then input that into logpdf of multinomial
+        for dist in model.distributions():
+            log_liklihood += dist.logpdf()
+        log_liklihood += reward_prime
+        a = log_liklihood - np.log(model.reward)
+        if np.log(np.random.rand()) <= np.minimum(1, a):
+            model.policy = policy_prime
+            model.reward = reward_prime
             # acceptance_count += 1
-#     return current_policy, current_value
+    return model
 
-
-def run_model():
-
-    pass
 
 def main(search_for_policy=metropolis_hastings):
+    # env = gym.make("maze-sample-5x5-v0")  # TODO: change to random
     gym.envs.registration.register(
         id='NChain-custom-v0',
         entry_point='gym.envs.toy_text:NChainEnv',
@@ -79,30 +95,10 @@ def main(search_for_policy=metropolis_hastings):
         max_episode_steps=1000
     )
     env = gym.make('NChain-custom-v0')
+    model = Model(env)
+    model = search_for_policy(model)
+    print(model.policy)
 
-    parameters = init_parameters()
-    current_value = value(env, parameters['policy'])
-    current_trace = 0
-
-
-
-
-
-
-    # env = gym.make("maze-sample-3x3-v0")  # TODO: change to random
-
-
-
-
-    # v = defaultdict(float)
-    # q, policy = control(env, create_epsilon_greedy_policy)
-    # for state, actions in q.items():
-    #     action_value = np.max(actions)
-    #     v[state] = action_value
-    #
-    # time.sleep(.1)  # so print output isn't messed up
-    # for k in sorted(v, key=v.get, reverse=True):
-    #     print(tuple(_to_unhashable(k, dtype=int)), v[k])
 
 if __name__ == '__main__':
     main()
