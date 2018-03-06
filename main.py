@@ -19,7 +19,7 @@ class Model:
         self._policy = scipy.stats.multinomial(n=1, p=self.bias)
         self.policy = self._policy.rvs(size=env.observation_space.shape)
 
-        self.reward = self.run()
+        self.reward = 0.0
 
     def propose_policy(self, from_policy=None, num_states_to_change=1):
         if from_policy is None:
