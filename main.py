@@ -21,7 +21,7 @@ class Model:
 
         self.reward = 0.0
 
-    def propose_policy(self, from_policy=None, num_states_to_change=1):
+    def propose_policy(self, from_policy=None, num_states_to_change=10):
         if from_policy is None:
             from_policy = self.policy
 
@@ -92,7 +92,13 @@ def metropolis_hastings(model, iterations=1000, render_mode_fn=lambda i: 'human'
 
 
 def main(search_for_policy=metropolis_hastings):
-    env = gym.make("openmaze-v0")  # TODO: change to random
+    gym.envs.registration.register(
+        id='openmaze-custom-v0',
+        entry_point='gym_openmaze.envs.openmaze:OpenMaze',
+        kwargs={'size': (10, 7), 'random': False},
+        max_episode_steps=10000
+    )
+    env = gym.make('openmaze-custom-v0')  # TODO: change to random
 
     model = Model(env, bias=[.85, .05, .05, .05])
     search_for_policy(model)
