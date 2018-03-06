@@ -6,7 +6,7 @@ import scipy.stats
 
 
 class Model:
-    def __init__(self, env, bias=None, render_mode=None):
+    def __init__(self, env, bias=None):
         self.env = env
 
         if bias is None:
@@ -19,8 +19,7 @@ class Model:
         self._policy = scipy.stats.multinomial(n=1, p=self.bias)
         self.policy = self._policy.rvs(size=env.observation_space.shape)
 
-        self.render_mode = render_mode
-        self.reward = self.run(render_mode=self.render_mode)
+        self.reward = self.run()
 
     def propose_policy(self, from_policy=None, num_states_to_change=1):
         if from_policy is None:
@@ -45,9 +44,6 @@ class Model:
     def run(self, policy=None, render_mode=None):
         if policy is None:
             policy = self.policy
-
-        if render_mode is None:
-            render_mode = self.render_mode
 
         state = self.env.reset()
         total_reward = 0.0
@@ -81,11 +77,11 @@ class Model:
         return ll
 
 
-def metropolis_hastings(model, iterations=1000):
+def metropolis_hastings(model, iterations=1000, render_mode_fn=lambda i: 'human' if i % 50 == 0 else None):
     with trange(iterations) as progress:
-        for _ in progress:
+        for i in progress:
             policy_prime = model.propose_policy()
-            reward_prime = model.run(policy=policy_prime)
+            reward_prime = model.run(policy=policy_prime, render_mode=render_mode_fn(i))
 
             a = np.log(model.likelihood(policy=policy_prime, reward=reward_prime)) - model.reward
             if np.log(np.random.rand()) <= np.minimum(1, a):
@@ -98,10 +94,8 @@ def metropolis_hastings(model, iterations=1000):
 def main(search_for_policy=metropolis_hastings):
     env = gym.make("openmaze-v0")  # TODO: change to random
 
-    model = Model(env, bias=[.85, .05, .05, .05], render_mode='human')
-    start_policy = model.policy
-    model = search_for_policy(model)
-    print(np.abs(model.policy - start_policy).sum())
+    model = Model(env, bias=[.85, .05, .05, .05])
+    search_for_policy(model)
 
 
 if __name__ == '__main__':
