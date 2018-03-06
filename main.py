@@ -1,4 +1,5 @@
 import gym
+import gym_openmaze
 import numpy as np
 from tqdm import trange
 import scipy.stats
@@ -9,19 +10,12 @@ class Model:
         self.env = env
 
         # TODO: do these need to change throughout the program?
-        self.bias = scipy.stats.dirichlet([1.0] * env.action_space.n)
-        self.pi = scipy.stats.multinomial(n=1, p=self.bias.rvs()[0])
+        self._bias = scipy.stats.dirichlet([1.0] * env.action_space.n)
+        self.bias = self._bias.rvs()[0]
+        self._policy = scipy.stats.multinomial(n=1, p=self.bias)
+        self.policy = self._policy.rvs(size=env.observation_space.shape)
 
-        if isinstance(env.observation_space, gym.spaces.Box):
-            self._policy_size = self.env.observation_space.high[0] + 1
-        elif isinstance(env.observation_space, gym.spaces.Discrete):
-            self._policy_size = env.observation_space.n
-        else:
-            raise ValueError("Cannot determine policy size")
-
-        self.policy = self.pi.rvs(size=self._policy_size)
-
-        self.reward = self.run()
+        self.reward = self.run(render=False)
 
     def propose_policy(self, from_policy=None):
         if from_policy is None:
@@ -29,7 +23,8 @@ class Model:
 
         if np.random.randint(0, 2) == 0:
             # TODO: this doesnt seem right? just sample it again?
-            self.bias = scipy.stats.dirichlet([1.0] * self.env.action_space.n)
+            self._bias = scipy.stats.dirichlet([1.0] * self.env.action_space.n)
+            self.bias = self._bias.rvs()[0]
         else:
             from_policy = np.copy(from_policy)
             state_row = np.random.randint(0, from_policy.shape[0])
@@ -48,9 +43,7 @@ class Model:
         state = self.env.reset()
         total_reward = 0.0
         while True:
-            # probabilities = policy(state)
-            # action = np.random.choice(len(probabilities), p=probabilities)
-            action = np.argwhere(policy[state])[0][0]  # TODO: awk...
+            action = np.random.choice(self.env.action_space.n, p=policy[tuple(state)])
             observation, reward, done, info = self.env.step(action)
 
             if render:
@@ -64,40 +57,51 @@ class Model:
 
         return total_reward
 
-    def distributions(self):
-        return [self.bias, self.pi]
+    def log_likelihood(self, policy=None, reward=None):
+        if policy is None:
+            policy = self.policy
+        if reward is None:
+            reward = self.reward
+
+        ll = self._bias.logpdf(self.bias)
+        # TODO: do we have to loop?
+        for p in policy:
+            for x in p:
+               ll += self._policy.logpmf(x, 1, self.bias)
+        # x = self._policy.logpmf(policy[0])
+        ll += reward
+        return ll
 
 
 def metropolis_hastings(model, iterations=1000):
-    # acceptance_count = 0
-    log_liklihood = 0.0
-    for _ in trange(iterations):
-        policy_prime = model.propose_policy()
-        reward_prime = model.run(policy=policy_prime)
-        # TODO: need to get the logpdf of the dirichlet at the current frozen dirichlet sample and then input that into logpdf of multinomial
-        for dist in model.distributions():
-            log_liklihood += dist.logpdf()
-        log_liklihood += reward_prime
-        a = log_liklihood - np.log(model.reward)
-        if np.log(np.random.rand()) <= np.minimum(1, a):
-            model.policy = policy_prime
-            model.reward = reward_prime
-            # acceptance_count += 1
+    with trange(iterations) as progress:
+        progress.set_description('reward 0.0, changed 0')
+        for _ in progress:
+            policy_prime = model.propose_policy()
+            reward_prime = model.run(policy=policy_prime, render=False)
+
+            a = model.log_likelihood(policy=policy_prime, reward=reward_prime) - np.log(model.reward)
+            if np.log(np.random.rand()) <= np.minimum(1, a):
+                progress.set_description('reward {}, changed {}'.format(reward_prime, np.abs(model.policy - policy_prime).sum()))
+                model.policy = policy_prime
+                model.reward = reward_prime
+
     return model
 
 
 def main(search_for_policy=metropolis_hastings):
-    # env = gym.make("maze-sample-5x5-v0")  # TODO: change to random
-    gym.envs.registration.register(
-        id='NChain-custom-v0',
-        entry_point='gym.envs.toy_text:NChainEnv',
-        kwargs={'n': 5, 'slip': 0.0},
-        max_episode_steps=1000
-    )
-    env = gym.make('NChain-custom-v0')
+    env = gym.make("openmaze-v0")  # TODO: change to random
+    # gym.envs.registration.register(
+    #     id='NChain-custom-v0',
+    #     entry_point='gym.envs.toy_text:NChainEnv',
+    #     kwargs={'n': 5, 'slip': 0.0},
+    #     max_episode_steps=1000
+    # )
+    # env = gym.make('NChain-custom-v0')
     model = Model(env)
+    start_policy = model.policy
     model = search_for_policy(model)
-    print(model.policy)
+    print(np.abs(model.policy - start_policy).sum())
 
 
 if __name__ == '__main__':
