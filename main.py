@@ -67,25 +67,22 @@ class Model:
         # TODO: do we have to loop?
         for p in policy:
             for x in p:
-               ll += self._policy.logpmf(x, 1, self.bias)
-        # x = self._policy.logpmf(policy[0])
+                ll += self.bias[np.argmax(x)]
         ll += reward
         return ll
 
 
 def metropolis_hastings(model, iterations=1000):
     with trange(iterations) as progress:
-        progress.set_description('reward 0.0, changed 0')
         for _ in progress:
             policy_prime = model.propose_policy()
             reward_prime = model.run(policy=policy_prime, render=False)
 
             a = model.log_likelihood(policy=policy_prime, reward=reward_prime) - np.log(model.reward)
             if np.log(np.random.rand()) <= np.minimum(1, a):
-                progress.set_description('reward {}, changed {}'.format(reward_prime, np.abs(model.policy - policy_prime).sum()))
                 model.policy = policy_prime
                 model.reward = reward_prime
-
+            progress.set_description('reward {}'.format(model.reward))
     return model
 
 
