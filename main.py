@@ -6,7 +6,7 @@ import scipy.stats
 
 
 class Model:
-    def __init__(self, env):
+    def __init__(self, env, render_mode=None):
         self.env = env
 
         # TODO: do these need to change throughout the program?
@@ -15,7 +15,8 @@ class Model:
         self._policy = scipy.stats.multinomial(n=1, p=self.bias)
         self.policy = self._policy.rvs(size=env.observation_space.shape)
 
-        self.reward = self.run(render=False)
+        self.render_mode = render_mode
+        self.reward = self.run(render_mode=self.render_mode)
 
     def propose_policy(self, from_policy=None):
         if from_policy is None:
@@ -36,9 +37,12 @@ class Model:
 
         return from_policy
 
-    def run(self, policy=None, render=False):
+    def run(self, policy=None, render_mode=None):
         if policy is None:
             policy = self.policy
+
+        if render_mode is None:
+            render_mode = self.render_mode
 
         state = self.env.reset()
         total_reward = 0.0
@@ -46,8 +50,8 @@ class Model:
             action = np.random.choice(self.env.action_space.n, p=policy[tuple(state)])
             observation, reward, done, info = self.env.step(action)
 
-            if render:
-                self.env.render()
+            if render_mode is not None:
+                self.env.render(mode=render_mode)
 
             total_reward += reward
 
@@ -57,13 +61,13 @@ class Model:
 
         return total_reward
 
-    def log_likelihood(self, policy=None, reward=None):
+    def likelihood(self, policy=None, reward=None):
         if policy is None:
             policy = self.policy
         if reward is None:
             reward = self.reward
 
-        ll = self._bias.logpdf(self.bias)
+        ll = self._bias.pdf(self.bias)
         # TODO: do we have to loop?
         for p in policy:
             for x in p:
@@ -76,26 +80,20 @@ def metropolis_hastings(model, iterations=1000):
     with trange(iterations) as progress:
         for _ in progress:
             policy_prime = model.propose_policy()
-            reward_prime = model.run(policy=policy_prime, render=False)
+            reward_prime = model.run(policy=policy_prime)
 
-            a = model.log_likelihood(policy=policy_prime, reward=reward_prime) - np.log(model.reward)
+            a = np.log(model.likelihood(policy=policy_prime, reward=reward_prime)) - model.reward
             if np.log(np.random.rand()) <= np.minimum(1, a):
                 model.policy = policy_prime
                 model.reward = reward_prime
-            progress.set_description('reward {}'.format(model.reward))
+            progress.set_description('reward {}, a {}'.format(model.reward, a))
     return model
 
 
 def main(search_for_policy=metropolis_hastings):
     env = gym.make("openmaze-v0")  # TODO: change to random
-    # gym.envs.registration.register(
-    #     id='NChain-custom-v0',
-    #     entry_point='gym.envs.toy_text:NChainEnv',
-    #     kwargs={'n': 5, 'slip': 0.0},
-    #     max_episode_steps=1000
-    # )
-    # env = gym.make('NChain-custom-v0')
-    model = Model(env)
+
+    model = Model(env, render_mode='human')
     start_policy = model.policy
     model = search_for_policy(model)
     print(np.abs(model.policy - start_policy).sum())
