@@ -5,3 +5,4 @@ gym>=0.10.3
 https://api.github.com/repos/catalys1/gym-openmaze/tarball
 numpy>=1.14.0
 tqdm>=4.19.5
+matplotlib
