@@ -15,10 +15,7 @@ def _normalize(v, ord=1, axis=-1):
     return v / norm
 
 
-def explore(env, policy, render_mode=None, progress_bar=None):
-    if render_mode == 'human':
-        progress_bar.write('\n{}'.format(policy))
-
+def explore(env, policy, render_mode=None):
     state = env.reset()
     total_reward = 0.0
 
@@ -35,7 +32,7 @@ def explore(env, policy, render_mode=None, progress_bar=None):
     return total_reward / step_count, step_count
 
 
-def model(pp, env, current_step, total_steps=0, progress_bar=None):
+def model(pp, env):
     # HACK
     bias = np.zeros(env.action_space.n)
     for i in range(env.action_space.n):
@@ -45,10 +42,9 @@ def model(pp, env, current_step, total_steps=0, progress_bar=None):
     actions = np.arange(env.action_space.n, dtype=np.int8)
     policy = np.zeros((env.observation_space.n, env.action_space.n), dtype=np.int8)
     for i in range(env.observation_space.n):
-        action_idx = pp.choice(elements=actions, p=bias, name='policy', loop_iter=i)
-        policy[i, action_idx] = 1
-    # m = 'human' if total_steps == current_step + 1 else None
-    val, _ = explore(env, policy, render_mode=None, progress_bar=progress_bar)
+        act = pp.choice(elements=actions, p=bias, name='policy', loop_iter=i)
+        policy[i, act] = 1
+    val, _ = explore(env, policy)
 
     pp.choice(elements=[1, 0], p=[min(1, val), max(0, 1. - val)], name='r')
 
@@ -66,7 +62,7 @@ if __name__ == '__main__':
     env = gym.make('NChain-custom-v0')
     actions = ['F', 'B']
 
-    driver = InferenceDriver(lambda pp, i=0, bar=None: model(pp, env, i, total_steps=num_samples, progress_bar=bar))
+    driver = InferenceDriver(lambda pp: model(pp, env))
 
     driver.condition(label='r-0', value=1)
 

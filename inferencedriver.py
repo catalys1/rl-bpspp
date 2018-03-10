@@ -34,7 +34,7 @@ class InferenceDriver:
         with trange(samples, desc='inference') as progress_bar:
             for s in progress_bar:
                 for i in range(interval):
-                    did_accept, threshold = self.inference_step(s, progress_bar)
+                    did_accept, threshold = self.inference_step()
                     num_accepted += 1 if did_accept else 0
                 self.samples.append(copy.deepcopy(self.pp.table.trace))
                 progress_bar.set_postfix(
@@ -60,7 +60,7 @@ class InferenceDriver:
         # value, F, R = self.pp.sample_erp(entry["erp"], entry["parameters"]) # sample kernal
         self.pp.store_new_erp(label, value, entry["erp"], entry["parameters"])
         # re-run the model
-        self.model(self.pp, step_count, progress_bar)
+        self.model(self.pp)
         # score the new trace
         ll_prime, ll_fresh, ll_stale = self.pp.score_proposed_trace()
         # calculate MH acceptance ratio
