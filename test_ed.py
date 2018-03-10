@@ -43,44 +43,49 @@ def run_maze(env, policy, render_mode=None, render_step=1, max_previous_states=4
 
 
 if __name__ == '__main__':
-    n_iter = 10000
+    n_iter = 1000
     logdir = 'logdir'
 
-    env = gym.make('openmaze-v0')
+    env = gym.make('CartPole-v0')
 
     actions = {0: 'N', 1: 'E', 2: 'S', 3: 'W'}
-    bias = np.array([.575, .2, .025, .2], dtype=np.float32)  # TODO: learn this
     policy_shape = [*env.observation_space.shape, 1]
     policy_len = np.multiply(*env.observation_space.shape)
 
+
+    sess = ed.get_session()
+
     # define the model
+    # bias = np.array([.575, .2, .025, .2], dtype=np.float32)  # TODO: learn this
+    bias = ed.models.Dirichlet(concentration=tf.ones(env.action_space.n), value=[.575, .2, .025, .2])
+    bias_posterior = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *bias.shape])))
+    bias_proposal = ed.models.Normal(loc=bias, scale=.9)
     policy = {}
-    latent_vars = {}
-    proposal_vars = {}
+    latent_vars = {bias: bias_posterior}
+    proposal_vars = {bias: bias_proposal}
     it = 0
     for y in range(policy_shape[0]):
         for x in range(policy_shape[1]):
             avail_actions = env.action_space.available_actions(y, x)
-            if not avail_actions:
-                continue
 
-            b = _normalize(np.array([bias[a] if a in avail_actions else 0. for a in actions.keys()], dtype=np.float32))
+            print(avail_actions)
+
+            b = tf.norm(tf.multiply(bias, avail_actions), ord=1)
             pi = ed.models.Multinomial(total_count=1., probs=b)
             pi_posterier = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *b.shape])))
-            pi_proposal = ed.models.Normal(loc=pi, scale=10., value=pi)
+            pi_proposal = ed.models.Normal(loc=pi, scale=.9, value=pi)
 
             policy[(y, x)] = pi
             latent_vars[pi] = pi_posterier
             proposal_vars[pi] = pi_proposal
             it += 1
     policy_value = tf.placeholder(tf.float32)
-    r = ed.models.Binomial(total_count=1., probs=policy_value, value=1.)
+    r = ed.models.Categorical(probs=[1. - policy_value, policy_value])
 
-    inference = ed.MetropolisHastings(latent_vars=latent_vars, proposal_vars=proposal_vars, data={r: 1.0})
+    inference = ed.MetropolisHastings(latent_vars=latent_vars, proposal_vars=proposal_vars, data={r: 1})
     inference.initialize(logdir=logdir)
     tf.global_variables_initializer().run()
 
-    sess = ed.get_session()
     with tqdm.trange(inference.n_iter, desc='inference') as progress_bar:
         for _ in progress_bar:
             value, i = run_maze(env, {key: sess.run(val) for key, val in policy.items()})

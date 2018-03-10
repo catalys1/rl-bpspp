@@ -2,6 +2,7 @@ import collections
 import itertools
 
 import gym
+import gym_openmaze
 import numpy as np
 
 from inferencedriver import InferenceDriver
@@ -63,13 +64,7 @@ def model(pp, env, current_step, total_steps):
 if __name__ == '__main__':
     num_samples = 5000
 
-    gym.envs.registration.register(
-        id='openmaze-custom-v0',
-        entry_point='gym_openmaze.envs.openmaze:OpenMaze',
-        kwargs={'size': (10, 7), 'random': False},
-        max_episode_steps=100000
-    )
-    env = gym.make('openmaze-custom-v0')  # TODO: change to random
+    env = gym.make('openmaze-v0')  # TODO: change to random
 
     driver = InferenceDriver(lambda pp, i: model(pp, env, current_step=i, total_steps=num_samples))
 

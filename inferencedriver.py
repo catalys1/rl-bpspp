@@ -20,32 +20,30 @@ class InferenceDriver:
 
     def init_model(self):
         # prime the database
-        self.model(self.pp, 0)
+        self.model(self.pp)
         self.pp.accept_proposed_trace()
 
     def burn_in(self, steps):
-        # start = timer()
         for i in trange(steps, desc='  burn in'):
-            self.inference_step(0)
-        # print("Burn in: %.2fs" % (timer() - start))
+            self.inference_step()
 
     def run_inference(self, interval, samples):
         self.num_samples = samples
-        # total_start = timer()
         num_accepted = 0
         threshold = None
         with trange(samples, desc='inference') as progress_bar:
             for s in progress_bar:
                 for i in range(interval):
-                    did_accept, threshold = self.inference_step(s)
+                    did_accept, threshold = self.inference_step(s, progress_bar)
                     num_accepted += 1 if did_accept else 0
                 self.samples.append(copy.deepcopy(self.pp.table.trace))
                 progress_bar.set_postfix(
                     {'num_accepted': num_accepted,
                      'acceptance_rate': num_accepted / max(1, s),
                      'threshold': threshold})
+        return self.pp.table.trace
 
-    def inference_step(self, step_count):
+    def inference_step(self, step_count=0, progress_bar=None):
         # score the current trace
         ll = self.pp.score_current_trace()
         self.lls.append(ll)
@@ -62,7 +60,7 @@ class InferenceDriver:
         # value, F, R = self.pp.sample_erp(entry["erp"], entry["parameters"]) # sample kernal
         self.pp.store_new_erp(label, value, entry["erp"], entry["parameters"])
         # re-run the model
-        self.model(self.pp, step_count)
+        self.model(self.pp, step_count, progress_bar)
         # score the new trace
         ll_prime, ll_fresh, ll_stale = self.pp.score_proposed_trace()
         # calculate MH acceptance ratio
