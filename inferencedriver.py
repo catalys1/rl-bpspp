@@ -11,7 +11,6 @@ from tqdm import trange
 
 
 class InferenceDriver:
-
     def __init__(self, model):
         self.pp = ProbPy()
         self.model = model
@@ -37,10 +36,11 @@ class InferenceDriver:
                     did_accept, threshold = self.inference_step()
                     num_accepted += 1 if did_accept else 0
                 self.samples.append(copy.deepcopy(self.pp.table.trace))
-                progress_bar.set_postfix(
-                    {'num_accepted': num_accepted,
-                     'acceptance_rate': num_accepted / max(1, s),
-                     'threshold': threshold})
+                progress_bar.set_postfix({
+                    'num_accepted': num_accepted,
+                    'acceptance_rate': num_accepted / max(1, s),
+                    'threshold': threshold
+                })
         return self.pp.table.trace
 
     def inference_step(self, step_count=0, progress_bar=None):
@@ -53,8 +53,10 @@ class InferenceDriver:
         label, entry = self.pp.pick_random_erp()
         # propose a new value
         if entry["erp"] == "choice":
-            value, F, R = self.pp.choice_proposal_kernal(entry["value"],
-                                                         entry["parameters"]["elements"], entry["parameters"]["p"])
+            value, F, R = self.pp.choice_proposal_kernal(
+                entry["value"], entry["parameters"]["elements"],
+                entry["parameters"]["p"]
+            )
         else:
             value, F, R = self.pp.simple_proposal_kernal(entry["value"])
         # value, F, R = self.pp.sample_erp(entry["erp"], entry["parameters"]) # sample kernal
@@ -113,7 +115,6 @@ class InferenceDriver:
         for k in keys:
             data[k] = []
             for s in self.samples:
-                values_dict = {}
                 for key, item in s.items():
                     if k + '-0' == key:
                         data[k].append(item['value'])

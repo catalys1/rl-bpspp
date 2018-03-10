@@ -1,8 +1,7 @@
 import itertools
-import pprint
 
 import gym
-import gym_openmaze
+import gym_openmaze  # NOQA
 import numpy as np
 
 from inferencedriver import InferenceDriver
@@ -40,7 +39,8 @@ def model(pp, env):
     bias = _normalize(bias)
 
     actions = np.arange(env.action_space.n, dtype=np.int8)
-    policy = np.zeros((env.observation_space.n, env.action_space.n), dtype=np.int8)
+    policy = np.zeros((env.observation_space.n, env.action_space.n),
+                      dtype=np.int8)
     for i in range(env.observation_space.n):
         act = pp.choice(elements=actions, p=bias, name='policy', loop_iter=i)
         policy[i, act] = 1
@@ -56,7 +56,12 @@ if __name__ == '__main__':
     gym.envs.registration.register(
         id='NChain-custom-v0',
         entry_point='gym.envs.toy_text:NChainEnv',
-        kwargs={'n': 10, 'slip': 0.01, 'small': 0.01, 'large': 1.},
+        kwargs={
+            'n': 10,
+            'slip': 0.01,
+            'small': 0.01,
+            'large': 1.
+        },
         timestep_limit=500,
     )
     env = gym.make('NChain-custom-v0')
@@ -72,5 +77,7 @@ if __name__ == '__main__':
 
     driver.burn_in(steps=500)
 
-    for k, v in sorted(driver.run_inference(interval=2, samples=num_samples).items()):
+    for k, v in sorted(
+        driver.run_inference(interval=2, samples=num_samples).items()
+    ):
         print(k, v)

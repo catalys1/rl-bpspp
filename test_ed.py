@@ -17,7 +17,14 @@ def _normalize(v, ord=1, axis=-1):
     return v / norm
 
 
-def run_maze(env, policy, render_mode=None, render_step=1, max_previous_states=4, max_duplicate_states=None):
+def run_maze(
+    env,
+    policy,
+    render_mode=None,
+    render_step=1,
+    max_previous_states=4,
+    max_duplicate_states=None
+):
     if max_duplicate_states is None:
         max_duplicate_states = max(1, round(max_previous_states / 3))
 
@@ -35,7 +42,10 @@ def run_maze(env, policy, render_mode=None, render_step=1, max_previous_states=4
         total_reward += reward
 
         obs = tuple(observation)
-        if (len(previous_states) >= max_previous_states and previous_states.count(obs) >= max_duplicate_states) or done:
+        if (
+            len(previous_states) >= max_previous_states
+            and previous_states.count(obs) >= max_duplicate_states
+        ) or done:
             break
         state = obs
 
@@ -52,13 +62,16 @@ if __name__ == '__main__':
     policy_shape = [*env.observation_space.shape, 1]
     policy_len = np.multiply(*env.observation_space.shape)
 
-
     sess = ed.get_session()
 
     # define the model
     # bias = np.array([.575, .2, .025, .2], dtype=np.float32)  # TODO: learn this
-    bias = ed.models.Dirichlet(concentration=tf.ones(env.action_space.n), value=[.575, .2, .025, .2])
-    bias_posterior = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *bias.shape])))
+    bias = ed.models.Dirichlet(
+        concentration=tf.ones(env.action_space.n), value=[.575, .2, .025, .2]
+    )
+    bias_posterior = ed.models.Empirical(
+        params=tf.Variable(tf.zeros([n_iter, *bias.shape]))
+    )
     bias_proposal = ed.models.Normal(loc=bias, scale=.9)
     policy = {}
     latent_vars = {bias: bias_posterior}
@@ -72,7 +85,9 @@ if __name__ == '__main__':
 
             b = tf.norm(tf.multiply(bias, avail_actions), ord=1)
             pi = ed.models.Multinomial(total_count=1., probs=b)
-            pi_posterier = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *b.shape])))
+            pi_posterier = ed.models.Empirical(
+                params=tf.Variable(tf.zeros([n_iter, *b.shape]))
+            )
             pi_proposal = ed.models.Normal(loc=pi, scale=.9, value=pi)
 
             policy[(y, x)] = pi
@@ -82,15 +97,25 @@ if __name__ == '__main__':
     policy_value = tf.placeholder(tf.float32)
     r = ed.models.Categorical(probs=[1. - policy_value, policy_value])
 
-    inference = ed.MetropolisHastings(latent_vars=latent_vars, proposal_vars=proposal_vars, data={r: 1})
+    inference = ed.MetropolisHastings(
+        latent_vars=latent_vars, proposal_vars=proposal_vars, data={r: 1}
+    )
     inference.initialize(logdir=logdir)
     tf.global_variables_initializer().run()
 
     with tqdm.trange(inference.n_iter, desc='inference') as progress_bar:
         for _ in progress_bar:
-            value, i = run_maze(env, {key: sess.run(val) for key, val in policy.items()})
+            value, i = run_maze(
+                env, {key: sess.run(val)
+                      for key, val in policy.items()}
+            )
             info = inference.update(feed_dict={policy_value: value})
-            progress_bar.set_postfix(accept_rate=info['accept_rate'], val=value, maze_it=i)
-        final_policy = {key: actions[int(np.argmax(sess.run(val)))] for key, val in policy.items()}
+            progress_bar.set_postfix(
+                accept_rate=info['accept_rate'], val=value, maze_it=i
+            )
+        final_policy = {
+            key: actions[int(np.argmax(sess.run(val)))]
+            for key, val in policy.items()
+        }
         progress_bar.write(pprint.pformat(final_policy))
     inference.finalize()

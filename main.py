@@ -30,7 +30,9 @@ class Model:
         self.path, self.reward = self.run()
         self.log_likelihood = self.compute_log_likelihood()
 
-    def propose_policy(self, from_policy=None, from_path=None, num_states_to_change=1):
+    def propose_policy(
+        self, from_policy=None, from_path=None, num_states_to_change=1
+    ):
         if from_policy is None:
             from_policy = self.policy
 
@@ -100,7 +102,9 @@ def metropolis_hastings(model, iterations=1000):
             policy_prime = model.propose_policy()
             path_prime, reward_prime = model.run(policy=policy_prime)
 
-            log_likelihood_prime = model.compute_log_likelihood(policy=policy_prime, reward=reward_prime)
+            log_likelihood_prime = model.compute_log_likelihood(
+                policy=policy_prime, reward=reward_prime
+            )
             a = log_likelihood_prime - model.log_likelihood
             if np.log(np.random.rand()) <= np.minimum(0.0, a):
                 model.policy = policy_prime
@@ -108,7 +112,9 @@ def metropolis_hastings(model, iterations=1000):
                 model.log_likelihood = log_likelihood_prime
                 model.path = path_prime
                 acceptance_count += 1
-                progress.set_description('a: {}, acceptance count: {}'.format(a, acceptance_count))
+                progress.set_description(
+                    'a: {}, acceptance count: {}'.format(a, acceptance_count)
+                )
     return model
 
 
@@ -116,7 +122,10 @@ def main(search_for_policy=metropolis_hastings):
     gym.envs.registration.register(
         id='openmaze-custom-v0',
         entry_point='gym_openmaze.envs.openmaze:OpenMaze',
-        kwargs={'size': (10, 7), 'random': False},
+        kwargs={
+            'size': (10, 7),
+            'random': False
+        },
         max_episode_steps=10000
     )
     env = gym.make('openmaze-custom-v0')  # TODO: change to random

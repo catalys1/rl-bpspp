@@ -45,7 +45,12 @@ if __name__ == '__main__':
     gym.envs.registration.register(
         id='NChain-custom-v0',
         entry_point='gym.envs.toy_text:NChainEnv',
-        kwargs={'n': 5, 'slip': 0., 'small': 0.01, 'large': 1.},
+        kwargs={
+            'n': 5,
+            'slip': 0.,
+            'small': 0.01,
+            'large': 1.
+        },
         timestep_limit=1000,
     )
     env = gym.make('NChain-custom-v0')
@@ -53,24 +58,39 @@ if __name__ == '__main__':
 
     # define the model
     bias = ed.models.Dirichlet(concentration=tf.zeros(env.action_space.n))
-    bias_posterior = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *bias.shape])))
+    bias_posterior = ed.models.Empirical(
+        params=tf.Variable(tf.zeros([n_iter, *bias.shape]))
+    )
     bias_proposal = ed.models.Normal(loc=bias, scale=.2)
     # policy = OrderedDict()
     # policy_posterior = OrderedDict()
     # latent_vars = OrderedDict({bias: bias_posterior})
     # latent_vars = [bias]
     # for i in range(env.observation_space.n):
-    full_bias = tf.reshape(tf.tile(bias, [env.observation_space.n]), [env.observation_space.n, env.action_space.n])
+    full_bias = tf.reshape(
+        tf.tile(bias, [env.observation_space.n]),
+        [env.observation_space.n, env.action_space.n]
+    )
     policy = ed.models.Multinomial(total_count=1., probs=full_bias)
-    policy_posterier = ed.models.Empirical(params=tf.Variable(tf.zeros([n_iter, *full_bias.shape])))
+    policy_posterier = ed.models.Empirical(
+        params=tf.Variable(tf.zeros([n_iter, *full_bias.shape]))
+    )
     policy_proposal = ed.models.Normal(loc=policy, scale=.2)
 
     policy_value = tf.placeholder(tf.float32)
     r = ed.models.Categorical(probs=[1. - policy_value, policy_value])
 
-    inference = ed.MetropolisHastings(latent_vars={bias: bias_posterior, policy: policy_posterier},
-                                      proposal_vars={bias: bias_proposal, policy: policy_proposal},
-                                      data={r: 1.})
+    inference = ed.MetropolisHastings(
+        latent_vars={
+            bias: bias_posterior,
+            policy: policy_posterier
+        },
+        proposal_vars={
+            bias: bias_proposal,
+            policy: policy_proposal
+        },
+        data={r: 1.}
+    )
     inference.initialize()
     tf.global_variables_initializer().run()
 
@@ -79,7 +99,9 @@ if __name__ == '__main__':
         for _ in progress_bar:
             value = explore(env, sess.run(policy))
             info = inference.update(feed_dict={policy_value: value})
-            progress_bar.set_postfix(accept_rate=info['accept_rate'], val=value)
+            progress_bar.set_postfix(
+                accept_rate=info['accept_rate'], val=value
+            )
         final_policy = [actions[np.argmax(a)] for a in sess.run(policy)]
         progress_bar.write(pprint.pformat(final_policy))
     inference.finalize()

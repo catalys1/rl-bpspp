@@ -1,10 +1,10 @@
 import numpy as np
 from copy import deepcopy
 
-class TraceTable:
 
+class TraceTable:
     def __init__(self):
-        self.trace = {} # D from the paper
+        self.trace = {}  # D from the paper
         self.proposed_trace = {}
         self.ll = 0
         self.ll_fresh = 0
@@ -12,18 +12,26 @@ class TraceTable:
         self.active = set()
         self.clamped = {}
 
-    def add_entry_to_proposal(self, label, value, erp, parameters, likelihood, add_fresh):
+    def add_entry_to_proposal(
+        self, label, value, erp, parameters, likelihood, add_fresh
+    ):
         # TODO: correct?
         if (add_fresh):
             self.ll_fresh += likelihood
         self.active.add(label)
-        self.proposed_trace[label] = {"value": value,
-                        "erp": erp, "parameters": parameters, "likelihood": likelihood}
+        self.proposed_trace[label] = {
+            "value": value,
+            "erp": erp,
+            "parameters": parameters,
+            "likelihood": likelihood
+        }
 
     def read_entry_from_proposal(self, label, erp, parameters):
         if label in self.clamped.keys():
             return self.clamped[label]
-        if label in self.proposed_trace and self.proposed_trace[label]["erp"] == erp:
+        if label in self.proposed_trace and self.proposed_trace[label][
+            "erp"
+        ] == erp:
             if self.proposed_trace[label]["parameters"] == parameters:
                 self.active.add(label)
                 return self.proposed_trace[label]["value"]
@@ -34,7 +42,7 @@ class TraceTable:
 
     def pick_random_erp(self):
         keys = list(set(self.trace.keys()) - set(self.clamped.keys()))
-        if len(keys) <=0:
+        if len(keys) <= 0:
             raise ValueError("The only random variables are clamped...")
         label = keys[np.random.choice(range(len(keys)))]
         return label, self.trace[label]
@@ -70,6 +78,6 @@ class TraceTable:
 
     def condition(self, label, value):
         self.clamped[label] = value
-        
+
     def prior(self, label, value):
         self.trace[label]["value"] = value

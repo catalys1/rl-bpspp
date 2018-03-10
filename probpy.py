@@ -10,7 +10,6 @@ from tracetable import TraceTable
 
 
 class ProbPy:
-
     def __init__(self):
         self.table = TraceTable()
 
@@ -28,7 +27,9 @@ class ProbPy:
 
     def store_new_erp(self, label, value, erp, parameters):
         likelihood = self._get_likelihood(erp, parameters, value)
-        self.table.add_entry_to_proposal(label, value, erp, parameters, likelihood, True)
+        self.table.add_entry_to_proposal(
+            label, value, erp, parameters, likelihood, True
+        )
 
     def score_current_trace(self):
         return self.table.score_current_trace()
@@ -51,7 +52,9 @@ class ProbPy:
             add_fresh = False
         likelihood = self._uniform_pdf(0, 1)
         parameters = {}
-        self.table.add_entry_to_proposal(label, value, "random", parameters, likelihood, add_fresh)
+        self.table.add_entry_to_proposal(
+            label, value, "random", parameters, likelihood, add_fresh
+        )
         return value
 
     def randint(self, name, low, high=None, size=None, loop_iter=0):
@@ -64,7 +67,9 @@ class ProbPy:
             add_fresh = False
         likelihood = self._uniform_pdf(low, high)
         parameters = {"low": low, "high": high, "size": size}
-        self.table.add_entry_to_proposal(label, value, "randint", parameters, likelihood, add_fresh)
+        self.table.add_entry_to_proposal(
+            label, value, "randint", parameters, likelihood, add_fresh
+        )
         return value
 
     def normal(self, name, loc=0.0, scale=1.0, size=None, loop_iter=0):
@@ -77,20 +82,33 @@ class ProbPy:
             add_fresh = False
         likelihood = self._normal_pdf(loc, scale, value)
         parameters = {"loc": loc, "scale": scale, "size": size}
-        self.table.add_entry_to_proposal(label, value, "normal", parameters, likelihood, add_fresh)
+        self.table.add_entry_to_proposal(
+            label, value, "normal", parameters, likelihood, add_fresh
+        )
         return value
 
-    def choice(self, name, elements, size=None, replace=True, p=None, loop_iter=0):
+    def choice(
+        self, name, elements, size=None, replace=True, p=None, loop_iter=0
+    ):
         label = self._get_label(name, loop_iter)
         value = self.table.read_entry_from_proposal(label, "choice", None)
         if type(value) == bool:
             add_fresh = value
-            value = np.random.choice(a=elements, size=size, replace=replace, p=p)
+            value = np.random.choice(
+                a=elements, size=size, replace=replace, p=p
+            )
         else:
             add_fresh = False
         likelihood = self._categorical_pdf(elements, p, value)
-        parameters = {"elements": elements, "size": size, "replace": replace, "p": p}
-        self.table.add_entry_to_proposal(label, value, "choice", parameters, likelihood, add_fresh)
+        parameters = {
+            "elements": elements,
+            "size": size,
+            "replace": replace,
+            "p": p
+        }
+        self.table.add_entry_to_proposal(
+            label, value, "choice", parameters, likelihood, add_fresh
+        )
         return value
 
     # ----------------------------------
@@ -103,8 +121,8 @@ class ProbPy:
         return -np.log(high - low)
 
     def _normal_pdf(self, mean, standard_dev, value):
-        first_term = -1.0 * np.log(np.sqrt(2.0 * np.pi * (standard_dev ** 2)))
-        second_term = (-1.0 * (value - mean) ** 2) / (2.0 * (standard_dev ** 2))
+        first_term = -1.0 * np.log(np.sqrt(2.0 * np.pi * (standard_dev**2)))
+        second_term = (-1.0 * (value - mean)**2) / (2.0 * (standard_dev**2))
         return first_term + second_term
 
     def _categorical_pdf(self, elements, p, value):
@@ -168,6 +186,10 @@ class ProbPy:
         elif erp == "randint":
             return self._uniform_pdf(parameters["low"], parameters["high"])
         elif erp == "normal":
-            return self._normal_pdf(parameters["loc"], parameters["scale"], value)
+            return self._normal_pdf(
+                parameters["loc"], parameters["scale"], value
+            )
         elif erp == "choice":
-            return self._categorical_pdf(parameters["elements"], parameters["p"], value)
+            return self._categorical_pdf(
+                parameters["elements"], parameters["p"], value
+            )
