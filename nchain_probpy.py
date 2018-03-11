@@ -52,7 +52,6 @@ def model(pp, env, actions):
 
 if __name__ == '__main__':
     np.seterr(all='raise')
-    num_samples = 100
 
     gym.envs.registration.register(
         id='NChain-custom-v0',
@@ -79,7 +78,7 @@ if __name__ == '__main__':
 
     driver.burn_in(steps=50)
 
-    for k, v in driver.run_inference(interval=1, samples=num_samples).items():
+    for k, v in driver.run_inference(interval=1, samples=100).items():
         print(k, v)
 
     driver.plot_ll()
