@@ -76,7 +76,5 @@ if __name__ == '__main__':
 
     driver.burn_in(steps=500)
 
-    for k, v in sorted(
-        driver.run_inference(interval=2, samples=num_samples).items()
-    ):
+    for k, v in driver.run_inference(interval=2, samples=num_samples).items():
         print(k, v)

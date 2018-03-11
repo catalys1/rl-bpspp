@@ -7,7 +7,7 @@ import numpy as np
 class TraceTable:
     def __init__(self):
         self.trace = {}  # D from the paper
-        self.proposed_trace = {}
+        self.proposed_trace = OrderedDict()
         self.ll = 0
         self.ll_fresh = 0
         self.ll_stale = 0
