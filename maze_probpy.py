@@ -5,7 +5,7 @@ import gym
 import gym_openmaze
 import numpy as np
 
-from inferencedriver import InferenceDriver
+from probpy.inferencedriver import InferenceDriver
 
 
 def _normalize(v, ord=1, axis=-1):
@@ -15,20 +15,17 @@ def _normalize(v, ord=1, axis=-1):
     return v / norm
 
 
-def run_maze(
-    env, policy, render_mode=None, render_step=1, max_previous_states=4
-):
+def explore(env, policy, render_mode=None, max_previous_states=4):
     total_reward = 0.0
     state = tuple(env.reset())
 
     previous_states = collections.deque(maxlen=max_previous_states)
     for i in itertools.count():
         previous_states.append(state)
-        # action = np.random.choice(env.action_space.n, p=policy[state])
-        action = policy[state]
+        action = np.random.choice(env.action_space.n, p=policy[state])
         observation, reward, done, info = env.step(action)
 
-        if render_mode is not None and i % render_step == 0:
+        if render_mode is not None:
             env.render(mode=render_mode)
 
         total_reward += reward
@@ -41,52 +38,47 @@ def run_maze(
             break
         state = obs
 
-    return total_reward, i
+    # HACK so log works
+    return np.clip(total_reward / i, np.finfo(dtype=float).eps, 1.)
 
 
-def model(pp, env, current_step, total_steps):
-    # HACK
-    bias = np.zeros(env.action_space.n)
-    for i in range(env.action_space.n):
-        bias[i] = pp.random(name='bias', loop_iter=i)
-    bias = _normalize(bias)
+def model(pp, env, all_actions):
+    # HACK this should be a dirichlet
+    bias = _normalize([
+        pp.random(name='bias', loop_iter=i) for i in range(env.action_space.n)
+    ])
 
-    policy = np.zeros((*env.observation_space.shape, 1), dtype=np.int8)
+    policy = np.zeros((*env.observation_space.shape, env.action_space.n),
+                      dtype=np.int8)
     it = 0
-    for idx, _ in np.ndenumerate(policy):
-        # [0, 1, 2, 3] == ['N', 'E', 'S', 'W']
-        available_actions = env.action_space.available_actions(idx[0], idx[1])
-        if not available_actions:
-            continue
-        local_bias = _normalize([bias[a] for a in available_actions]
-                                )  # TODO: assumes available_actions is sorted
-        policy[idx] = pp.choice(
-            elements=available_actions,
-            p=local_bias,
-            name='policy',
-            loop_iter=it
-        )
-        it += 1
-    val, _ = run_maze(
-        env,
-        policy,
-        render_mode='human' if total_steps - current_step < 10 else None
-    )
+    for y in range(policy.shape[0]):
+        for x in range(policy.shape[1]):
+            available_actions = env.action_space.available_actions(y, x)
+            if not np.any(available_actions):
+                continue
+            local_bias = _normalize(np.multiply(bias, available_actions))
+            index = pp.choice(
+                elements=all_actions, p=local_bias, name='policy', loop_iter=it
+            )
+            policy[y, x, index] = 1  # one-hot, eg: [0, 1, 0, 0] == 'E'
+            it += 1
+
+    val = explore(env, policy)
 
     pp.choice(elements=[1., 0.], p=[val, 1. - val], name='r')
 
+    return val
+
 
 if __name__ == '__main__':
-    num_samples = 5000
+    np.seterr(all='raise')
 
-    env = gym.make('openmaze-v0')  # TODO: change to random
+    env = gym.make('openmazeurgency-v0')
+    # [0, 1, 2, 3] == ['N', 'E', 'S', 'W']
+    all_actions = np.arange(env.action_space.n)
 
-    driver = InferenceDriver(
-        lambda pp, i: model(pp, env, current_step=i, total_steps=num_samples)
-    )
-
+    driver = InferenceDriver(lambda pp: model(pp, env, all_actions))
     driver.condition(label='r-0', value=1.)
-
     driver.init_model()
     driver.prior(label="bias-0", value=.575)
     driver.prior(label="bias-1", value=.2)
@@ -95,4 +87,10 @@ if __name__ == '__main__':
 
     driver.burn_in(steps=1000)
 
-    driver.run_inference(interval=5, samples=num_samples)
+    for k, v in driver.run_inference(interval=1, samples=5000).items():
+        print(k, v)
+
+    driver.plot_ll()
+
+    rewards = driver.plot_model_results()
+    print(len(rewards), rewards, rewards.count(1.), sep='\n')
