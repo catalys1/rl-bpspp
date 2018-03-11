@@ -27,7 +27,7 @@ def explore(env, policy, render_mode=None):
             break
         state = obs
 
-    return total_reward / step_count, step_count
+    return np.clip(total_reward / step_count, 0., 1.), step_count
 
 
 def model(pp, env):
@@ -45,7 +45,7 @@ def model(pp, env):
         policy[i, act] = 1
     val, _ = explore(env, policy)
 
-    pp.choice(elements=[1, 0], p=[min(1, val), max(0, 1. - val)], name='r')
+    pp.choice(elements=[1, 0], p=[val, 1. - val], name='r')
 
 
 if __name__ == '__main__':
