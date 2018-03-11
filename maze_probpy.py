@@ -42,26 +42,24 @@ def explore(env, policy, render_mode=None, max_previous_states=4):
     return np.clip(total_reward / i, np.finfo(dtype=float).eps, 1.)
 
 
-def model(pp, env, all_actions):
-    # HACK this should be a dirichlet
-    bias = _normalize([
+def model(pp, env, actions):
+    # HACK: this should be a dirichlet
+    global_bias = _normalize([
         pp.random(name='bias', loop_iter=i) for i in range(env.action_space.n)
     ])
 
     policy = np.zeros((*env.observation_space.shape, env.action_space.n),
                       dtype=np.int8)
-    it = 0
+    i = 0
     for y in range(policy.shape[0]):
         for x in range(policy.shape[1]):
             available_actions = env.action_space.available_actions(y, x)
             if not np.any(available_actions):
                 continue
-            local_bias = _normalize(np.multiply(bias, available_actions))
-            index = pp.choice(
-                elements=all_actions, p=local_bias, name='policy', loop_iter=it
-            )
-            policy[y, x, index] = 1  # one-hot, eg: [0, 1, 0, 0] == 'E'
-            it += 1
+            bias = _normalize(np.multiply(global_bias, available_actions))
+            a = pp.choice(elements=actions, p=bias, name='policy', loop_iter=i)
+            policy[y, x, a] = 1  # one-hot, eg: [0, 1, 0, 0] == 'E'
+            i += 1
 
     val = explore(env, policy)
 
