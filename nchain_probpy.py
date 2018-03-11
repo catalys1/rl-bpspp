@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 
 import gym
-from inferencedriver import InferenceDriver
+from probpy.inferencedriver import InferenceDriver
 
 
 def _normalize(v, ord=1, axis=-1):

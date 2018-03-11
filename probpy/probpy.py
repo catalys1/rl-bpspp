@@ -2,7 +2,7 @@ import inspect
 
 import numpy as np
 
-from tracetable import TraceTable
+from probpy.tracetable import TraceTable
 
 
 class ProbPy:
