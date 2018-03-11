@@ -18,7 +18,7 @@ class TraceTable:
         self, label, value, erp, parameters, likelihood, add_fresh
     ):
         # TODO: correct?
-        if (add_fresh):
+        if add_fresh:
             self.ll_fresh += likelihood
         self.active.add(label)
         self.proposed_trace[label] = {

@@ -43,7 +43,7 @@ class InferenceDriver:
                 })
         return self.pp.table.trace
 
-    def inference_step(self, step_count=0, progress_bar=None):
+    def inference_step(self):
         # score the current trace
         ll = self.pp.score_current_trace()
         self.lls.append(ll)
