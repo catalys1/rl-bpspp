@@ -2,7 +2,6 @@
 
 > Reinforcement Learning Using Bayesian Policy Search with Policy Priors
 
-
 ## Installation
 
 ```bash
@@ -11,6 +10,7 @@ pip3 install -r requirements.txt
 ```
 
 ## Usage
+
 ```bash
-python3 main.py
+python3 nchain_probpy.py
 ```
