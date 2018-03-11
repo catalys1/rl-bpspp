@@ -91,4 +91,6 @@ if __name__ == '__main__':
     driver.plot_ll()
 
     rewards = driver.plot_model_results()
-    print(len(rewards), rewards, rewards.count(1.), sep='\n')
+    print('len(rewards):', len(rewards))
+    print(rewards)
+    print('close to 1.0 count:', np.count_nonzero(np.isclose(rewards, 1.)))
