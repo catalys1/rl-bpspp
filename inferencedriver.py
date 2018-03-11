@@ -1,13 +1,13 @@
 import copy
 
-import matplotlib
 import numpy as np
 
-matplotlib.use('Agg')
+import matplotlib
 import matplotlib.pyplot as plt
-from timeit import default_timer as timer
 from probpy import ProbPy
 from tqdm import trange
+
+matplotlib.use('Agg')
 
 
 class InferenceDriver:

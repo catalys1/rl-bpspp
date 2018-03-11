@@ -1,11 +1,7 @@
-import math
-import operator
-from functools import reduce
+import inspect
 
 import numpy as np
-import scipy.stats
-import scipy.special
-import inspect
+
 from tracetable import TraceTable
 
 

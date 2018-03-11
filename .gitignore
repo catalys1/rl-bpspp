@@ -205,3 +205,4 @@ tags
 ### Project Specific ###
 playground*
 logdir/
+.magicindex.json

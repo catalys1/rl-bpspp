@@ -1,9 +1,8 @@
 import itertools
 
-import gym
-import gym_openmaze  # NOQA
 import numpy as np
 
+import gym
 from inferencedriver import InferenceDriver
 
 
