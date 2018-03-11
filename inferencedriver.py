@@ -11,6 +11,7 @@ class InferenceDriver:
     def __init__(self, model):
         self.pp = ProbPy()
         self.model = model
+        self.model_results = []
         self.samples = []
         self.lls = []
 
@@ -30,14 +31,16 @@ class InferenceDriver:
         with trange(samples, desc='inference') as progress_bar:
             for s in progress_bar:
                 for i in range(interval):
-                    did_accept, threshold = self.inference_step()
-                    num_accepted += 1 if did_accept else 0
+                    did_accept, threshold, model_result = self.inference_step()
+                    num_accepted += did_accept
+                    self.model_results.append(model_result)
                 self.samples.append(copy.deepcopy(self.pp.table.trace))
-                progress_bar.set_postfix({
-                    'num_accepted': num_accepted,
-                    'acceptance_rate': num_accepted / max(1, s),
-                    'threshold': threshold
-                })
+                progress_bar.set_postfix(
+                    num_accepted=num_accepted,
+                    acceptance_rate=num_accepted / max(1, s),
+                    threshold=threshold,
+                    model=model_result,
+                )
         return self.pp.table.trace
 
     def inference_step(self):
@@ -59,7 +62,7 @@ class InferenceDriver:
         # value, F, R = self.pp.sample_erp(entry["erp"], entry["parameters"]) # sample kernal
         self.pp.store_new_erp(label, value, entry["erp"], entry["parameters"])
         # re-run the model
-        self.model(self.pp)
+        model_result = self.model(self.pp)
         # score the new trace
         ll_prime, ll_fresh, ll_stale = self.pp.score_proposed_trace()
         # calculate MH acceptance ratio
@@ -67,8 +70,8 @@ class InferenceDriver:
         # accept or reject
         if np.log(np.random.rand()) < threshold:
             self.pp.accept_proposed_trace()
-            return True, threshold
-        return False, threshold
+            return 1, threshold, model_result
+        return 0, threshold, model_result
 
     def condition(self, label, value):
         self.pp.table.condition(label, value)
@@ -117,6 +120,11 @@ class InferenceDriver:
                         data[k].append(item['value'])
         return data
 
-    def graph_ll(self):
+    def plot_ll(self):
         plt.plot(range(len(self.lls)), self.lls)
         plt.savefig("ll_figure.png")
+
+    def plot_model_results(self):
+        plt.plot(self.model_results)
+        plt.savefig("model_results.png")
+        return self.model_results
