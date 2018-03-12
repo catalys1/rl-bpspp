@@ -27,6 +27,7 @@ class InferenceDriver:
     def run_inference(self, interval, samples):
         self.num_samples = samples
         num_accepted = 0
+        model_success = 0
         threshold = None
         with trange(samples, desc='inference') as progress_bar:
             for s in progress_bar:
@@ -35,11 +36,12 @@ class InferenceDriver:
                     num_accepted += did_accept
                     self.model_results.append(model_result)
                 self.samples.append(copy.deepcopy(self.pp.table.trace))
+                if np.isclose(model_result, 1.):
+                    model_success += 1  # TODO: remove, this is model specific
                 progress_bar.set_postfix(
-                    num_accepted=num_accepted,
+                    acceptance_count=num_accepted,
                     acceptance_rate=num_accepted / max(1, s),
-                    threshold=threshold,
-                    model=model_result,
+                    model_success=model_success
                 )
         return self.pp.table.trace
 
@@ -82,6 +84,14 @@ class InferenceDriver:
     def return_traces(self):
         return self.samples
 
+    def finalize(self, fn=None):
+        if fn is None:
+            fn = self.model
+        return fn(self.pp)
+
+    def return_model_results(self):
+        return self.model_results
+
     def return_values(self, keys):
         values = {}
         val_cnt = {}
@@ -121,10 +131,12 @@ class InferenceDriver:
         return data
 
     def plot_ll(self):
+        plt.figure()
         plt.plot(range(len(self.lls)), self.lls)
         plt.savefig("ll_figure.png")
 
     def plot_model_results(self):
+        plt.figure()
         plt.plot(self.model_results)
         plt.savefig("model_results.png")
         return self.model_results
