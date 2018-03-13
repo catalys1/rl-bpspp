@@ -45,7 +45,7 @@ def model(pp, env, actions):
 
     val = explore(env, policy)
 
-    pp.choice(elements=[1, 0], p=[val, 1. - val], name='r')
+    pp.choice(elements=[1, 0], p=[val, env.reward_range[1] - val], name='r')
 
     return val
 
@@ -57,12 +57,12 @@ if __name__ == '__main__':
         id='NChain-custom-v0',
         entry_point='envs.modified_nchain:ModifiedNChainEnv',
         kwargs={
-            'n': 5,
-            'slip': 0.00,
+            'n': 8,
+            'slip': 0.20,
             'intermediate': 0,
             'end': 1.
         },
-        timestep_limit=100,
+        timestep_limit=500,
     )
     env = gym.make('NChain-custom-v0')
 
@@ -73,15 +73,15 @@ if __name__ == '__main__':
     driver = InferenceDriver(lambda pp: model(pp, env, actions))
     driver.condition(label='r-0', value=1)
     driver.init_model()
-    # driver.prior(label="bias-0", value=.9)
-    # driver.prior(label="bias-1", value=.1)
+    # driver.prior(label="bias-0", value=.1)
+    # driver.prior(label="bias-1", value=.9)
 
     driver.burn_in(steps=50)
 
-    for k, v in driver.run_inference(interval=1, samples=100).items():
+    for k, v in driver.run_inference(interval=1, samples=200).items():
         print(k, v)
 
     driver.plot_ll()
 
-    rewards = driver.plot_model_results()
-    print(len(rewards), rewards, rewards.count(1.), sep='\n')
+    # rewards = driver.plot_model_results()
+    # print(len(rewards), rewards, rewards.count(1.), sep='\n')

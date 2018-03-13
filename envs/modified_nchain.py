@@ -11,6 +11,7 @@ class ModifiedNChainEnv(gym.Env):
         self.state = 0  # Start at beginning of the chain
         self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Discrete(self.n)
+        self.reward_range = [intermediate, end]
         self.seed()
 
     def seed(self, seed=None):

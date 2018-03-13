@@ -8,12 +8,13 @@ from tqdm import trange
 
 
 class InferenceDriver:
-    def __init__(self, model):
+    def __init__(self, model, enable_progress=True):
         self.pp = ProbPy()
         self.model = model
         self.model_results = []
         self.samples = []
         self.lls = []
+        self.enable_progress = enable_progress
 
     def init_model(self):
         # prime the database
@@ -21,7 +22,8 @@ class InferenceDriver:
         self.pp.accept_proposed_trace()
 
     def burn_in(self, steps):
-        for i in trange(steps, desc='  burn in'):
+        disable = not self.enable_progress
+        for i in trange(steps, desc='  burn in', disable=disable):
             self.inference_step()
 
     def run_inference(self, interval, samples):
@@ -29,7 +31,8 @@ class InferenceDriver:
         num_accepted = 0
         model_success = 0
         threshold = None
-        with trange(samples, desc='inference') as progress_bar:
+        d = not self.enable_progress
+        with trange(samples, desc='inference', disable=d) as progress_bar:
             for s in progress_bar:
                 for i in range(interval):
                     did_accept, threshold, model_result = self.inference_step()
@@ -41,8 +44,7 @@ class InferenceDriver:
                 progress_bar.set_postfix(
                     acceptance_count=num_accepted,
                     acceptance_rate=num_accepted / max(1, s),
-                    model_success=model_success
-                )
+                    model_success=model_success)
         return self.pp.table.trace
 
     def inference_step(self):
@@ -57,8 +59,7 @@ class InferenceDriver:
         if entry["erp"] == "choice":
             value, F, R = self.pp.choice_proposal_kernal(
                 entry["value"], entry["parameters"]["elements"],
-                entry["parameters"]["p"]
-            )
+                entry["parameters"]["p"])
         else:
             value, F, R = self.pp.simple_proposal_kernal(entry["value"])
         # value, F, R = self.pp.sample_erp(entry["erp"], entry["parameters"]) # sample kernal
@@ -81,16 +82,17 @@ class InferenceDriver:
     def prior(self, label, value):
         self.pp.table.prior(label, value)
 
-    def return_traces(self):
-        return self.samples
+    #
+    # def return_traces(self):
+    #     return self.samples
 
     def finalize(self, fn=None):
         if fn is None:
             fn = self.model
         return fn(self.pp)
 
-    def return_model_results(self):
-        return self.model_results
+    # def return_model_results(self):
+    #     return self.model_results
 
     def return_values(self, keys):
         values = {}
@@ -130,13 +132,15 @@ class InferenceDriver:
                         data[k].append(item['value'])
         return data
 
-    def plot_ll(self):
+    def plot_ll(self, name="ll_figure.png"):
         plt.figure()
-        plt.plot(range(len(self.lls)), self.lls)
-        plt.savefig("ll_figure.png")
+        plt.ylabel('Log likelihood', fontsize=10)
+        plt.xlabel('Episodes', fontsize=10)
+        plt.plot(self.lls)
+        plt.savefig(name)
 
-    def plot_model_results(self):
+    def plot_model_results(self, mn):
         plt.figure()
         plt.plot(self.model_results)
-        plt.savefig("model_results.png")
+        plt.savefig()
         return self.model_results
