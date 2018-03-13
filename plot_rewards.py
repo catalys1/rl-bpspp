@@ -37,4 +37,4 @@ for _, plot in plot_data.items():
         color=plot['color'])
 plt.legend()
 plt.tight_layout()
-plt.savefig('charts/{}.png'.format(title))
+plt.savefig('charts_creative/{}.png'.format(title))

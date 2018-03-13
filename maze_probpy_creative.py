@@ -58,19 +58,19 @@ def model(pp, env, actions, global_bias=None, render_mode=None):
             available_actions = env.action_space.available_actions(y, x)
             if np.any(available_actions):
                 bias = _normalize(np.multiply(global_bias, available_actions))
-                name = 'policy_{}_{}_'.format(y, x)
-                action_idx = pp.choice(name, actions, p=bias, loop_iter=i)
-                # # action_sum = np.zeros(env.action_space.n)
-                # for j in range(11):
-                #     name = 'policy{}_{}_{}_'.format(j, y, x)
-                #     action = np.zeros(env.action_space.n)
-                #     action_idx = pp.choice(name, actions, p=bias, loop_iter=i)
-                #     action[action_idx] = 1
-                #     # print('before', action_sum)
-                #     action_sum += action
-                # # one-hot, eg: [0, 1, 0, 0] == 'E'
-                # policy[y, x] = _normalize(action_sum)
-                policy[y, x, action_idx] = 1
+                # name = 'policy_{}_{}_'.format(y, x)
+                # action_idx = pp.choice(name, actions, p=bias, loop_iter=i)
+                action_sum = np.zeros(env.action_space.n)
+                for j in range(11):
+                    name = 'policy{}_{}_{}_'.format(j, y, x)
+                    action = np.zeros(env.action_space.n)
+                    action_idx = pp.choice(name, actions, p=bias, loop_iter=i)
+                    action[action_idx] = 1
+                    # print('before', action_sum)
+                    action_sum += action
+                # one-hot, eg: [0, 1, 0, 0] == 'E'
+                policy[y, x] = _normalize(action_sum)
+                # policy[y, x, action_idx] = 1
             i += 1
 
     val = explore(env, policy, render_mode=render_mode)
@@ -129,7 +129,7 @@ def main(env_id, interval, samples, bias, enable_progress=False):
 
     bias_name = 'learned' if bias is None else '-'.join(str(b) for b in bias)
     name = '_'.join([env_id, str(interval), str(samples), bias_name])
-    path = 'results/{}.pkl'.format(name)
+    path = 'results_creative/{}.pkl'.format(name)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
 
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     # env_ids = ['OpenMazeDiscountCompletion-v0']
     # env_ids = ['OpenMazeOnlyCompletionReward-v0']
     env_ids = ['OpenMazeDiscountCompletion-v0']
-    intervals = [2, 5, 10]
+    intervals = [1]
     samples = range(200, 1001, 100)
     biases = [None, [.25] * 4, [.7, .1, .1, .1], [.1, .1, .7, .1]]
 
