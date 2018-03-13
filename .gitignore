@@ -207,3 +207,7 @@ playground*
 logdir/
 .magicindex.json
 *.png
+data/
+results*/
+*.bak
+charts/
